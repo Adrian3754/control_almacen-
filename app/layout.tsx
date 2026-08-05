@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import Header from "../components/Header";
@@ -15,17 +15,19 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// 1. Viewport exportado de forma independiente (Estándar de Next.js)
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
+// 2. Metadata limpia de la app
 export const metadata: Metadata = {
   title: "Control de Almacén",
   description: "Sistema de administración de tarimas e inventario",
   manifest: "/manifest.json", // 👈 Vinculación para habilitar la PWA
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    minimumScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  },
 };
 
 const navItems = [
@@ -35,7 +37,7 @@ const navItems = [
   { href: "/lotes", label: "Lotes" },
   { href: "/movimientos", label: "Movimientos" },
   { href: "/tarimas", label: "Tarimas" },
-  { href: "/reportes", label: "Reportes" }, // 🛠️ Corregido de /repostes a /reportes
+  { href: "/reportes", label: "Reportes" },
   { href: "/login", label: "Login" },
 ];
 
@@ -49,7 +51,8 @@ export default function RootLayout({
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-screen bg-linear-to-br from-blue-50 via-white to-indigo-50 text-slate-900">
+      {/* 3. Agregado overflow-x-hidden y w-full para bloquear el scroll blanco a la derecha */}
+      <body className="min-h-screen w-full overflow-x-hidden bg-gradient-to-br from-blue-50 via-white to-indigo-50 text-slate-900">
         <AuthGuard />
         <Header />
 
