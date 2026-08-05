@@ -19,6 +19,10 @@ export const metadata: Metadata = {
   title: "Control de Almacén",
   description: "Sistema de administración de tarimas e inventario",
   manifest: "/manifest.json", // 👈 Vinculación para habilitar la PWA
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+  },
 };
 
 const navItems = [
@@ -42,7 +46,7 @@ export default function RootLayout({
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 text-slate-900">
+      <body className="min-h-screen bg-linear-to-br from-blue-50 via-white to-indigo-50 text-slate-900">
         <AuthGuard />
         <Header />
 
