@@ -166,7 +166,7 @@ export default function CuentasPage() {
       <div className="max-w-7xl mx-auto p-6 sm:p-8">
         <section className="mb-8 rounded-3xl bg-slate-50 border border-slate-200 p-6 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
+            <div className="min-w-0">
               <h1 className="text-3xl font-semibold text-slate-900">Cuentas Bancarias</h1>
               <p className="mt-2 text-slate-600">Lista de cuentas con indicadores visuales por banco y un formulario rápido para dar de alta nuevas cuentas.</p>
             </div>
@@ -190,7 +190,7 @@ export default function CuentasPage() {
             <button
               type="button"
               onClick={() => setFiltersOpen((open) => !open)}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+              className="w-full sm:w-auto inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
             >
               <span className="text-base"></span>
              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -378,12 +378,12 @@ export default function CuentasPage() {
                     key={cuenta.id}
                     type="button"
                     onClick={() => setSelectedCuenta(cuenta)}
-                    className={`group w-full rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${getBankCardStyle(cuenta.banco)}`}
+                    className={`group w-full min-w-0 rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${getBankCardStyle(cuenta.banco)}`}
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
+                    <div className="flex flex-wrap items-start justify-between gap-3 min-w-0">
+                      <div className="min-w-0">
                         <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Proveedor</p>
-                        <p className="mt-2 text-base font-semibold text-slate-900">{cuenta.proveedor}</p>
+                        <p className="mt-2 text-base font-semibold text-slate-900 wrap-break-word">{cuenta.proveedor}</p>
                       </div>
                       <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getBankStyle(cuenta.banco)}`}>
                         {cuenta.banco || "Otro"}
@@ -391,11 +391,11 @@ export default function CuentasPage() {
                     </div>
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-xs uppercase tracking-wider text-slate-500">Giro</p>
-                        <p className="mt-1 text-sm text-slate-700">{cuenta.giro}</p>
+                        <p className="mt-1 text-sm text-slate-700 wrap-break-word">{cuenta.giro}</p>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-xs uppercase tracking-wider text-slate-500">Estado</p>
                         <span className={`mt-1 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${cuenta.activo ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"}`}>
                           {cuenta.activo ? "Activo" : "Inactivo"}
@@ -404,24 +404,24 @@ export default function CuentasPage() {
                     </div>
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-xs uppercase tracking-wider text-slate-500">Cuenta / CIE</p>
-                        <p className="mt-1 text-sm font-mono text-slate-700">{cuenta.cuenta_cie ?? "-"}</p>
+                        <p className="mt-1 text-sm font-mono text-slate-700 wrap-break-word">{cuenta.cuenta_cie ?? "-"}</p>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-xs uppercase tracking-wider text-slate-500">Beneficiario</p>
-                        <p className="mt-1 text-sm text-slate-700">{cuenta.beneficiario ?? "-"}</p>
+                        <p className="mt-1 text-sm text-slate-700 wrap-break-word">{cuenta.beneficiario ?? "-"}</p>
                       </div>
                     </div>
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-xs uppercase tracking-wider text-slate-500">Teléfono</p>
-                        <p className="mt-1 text-sm text-slate-700">{cuenta.telefono || "-"}</p>
+                        <p className="mt-1 text-sm text-slate-700 wrap-break-word">{cuenta.telefono || "-"}</p>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-xs uppercase tracking-wider text-slate-500">Dirección</p>
-                        <p className="mt-1 text-sm text-slate-700">{cuenta.direccion}</p>
+                        <p className="mt-1 text-sm text-slate-700 wrap-break-word">{cuenta.direccion}</p>
                       </div>
                     </div>
                   </button>
