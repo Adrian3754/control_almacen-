@@ -19,6 +19,39 @@ export type Cuenta = {
 };
 
 export type NewCuenta = Omit<Cuenta, "id" | "created_at">;
+export type CuentaUpdatePayload = Partial<NewCuenta> & { activo?: boolean };
+
+type CuentaRow = {
+  id: string | number;
+  proveedor?: string | null;
+  giro?: string | null;
+  direccion?: string | null;
+  telefono?: string | null;
+  banco?: string | null;
+  referencia?: string | null;
+  cuenta_cie?: string | null;
+  clave_bancaria?: string | null;
+  beneficiario?: string | null;
+  activo?: boolean | null;
+  created_at?: string | null;
+};
+
+function mapCuenta(item: CuentaRow): Cuenta {
+  return {
+    id: String(item.id),
+    proveedor: String(item.proveedor ?? ""),
+    giro: String(item.giro ?? ""),
+    direccion: String(item.direccion ?? ""),
+    telefono: String(item.telefono ?? ""),
+    banco: item.banco === null ? null : String(item.banco),
+    referencia: item.referencia === null ? null : String(item.referencia),
+    cuenta_cie: item.cuenta_cie === null ? null : String(item.cuenta_cie),
+    clave_bancaria: item.clave_bancaria === null ? null : String(item.clave_bancaria),
+    beneficiario: item.beneficiario === null ? null : String(item.beneficiario),
+    activo: Boolean(item.activo),
+    created_at: item.created_at ? String(item.created_at) : null,
+  };
+}
 
 export async function getCuentasAction(): Promise<Cuenta[]> {
   const supabase = createServerSupabaseClient();
@@ -35,20 +68,7 @@ export async function getCuentasAction(): Promise<Cuenta[]> {
     throw new Error("No se pudieron cargar las cuentas desde la base de datos.");
   }
 
-  return (data || []).map((item: any) => ({
-    id: String(item.id),
-    proveedor: String(item.proveedor ?? ""),
-    giro: String(item.giro ?? ""),
-    direccion: String(item.direccion ?? ""),
-    telefono: String(item.telefono ?? ""),
-    banco: item.banco === null ? null : String(item.banco),
-    referencia: item.referencia === null ? null : String(item.referencia),
-    cuenta_cie: item.cuenta_cie === null ? null : String(item.cuenta_cie),
-    clave_bancaria: item.clave_bancaria === null ? null : String(item.clave_bancaria),
-    beneficiario: item.beneficiario === null ? null : String(item.beneficiario),
-    activo: Boolean(item.activo),
-    created_at: item.created_at ? String(item.created_at) : null,
-  }));
+  return (data || []).map(mapCuenta);
 }
 
 export async function createCuentaAction(cuenta: NewCuenta): Promise<Cuenta> {
@@ -80,18 +100,51 @@ export async function createCuentaAction(cuenta: NewCuenta): Promise<Cuenta> {
 
   revalidatePath("/cuentas");
 
-  return {
-    id: String(data.id),
-    proveedor: String(data.proveedor ?? ""),
-    giro: String(data.giro ?? ""),
-    direccion: String(data.direccion ?? ""),
-    telefono: String(data.telefono ?? ""),
-    banco: data.banco === null ? null : String(data.banco),
-    referencia: data.referencia === null ? null : String(data.referencia),
-    cuenta_cie: data.cuenta_cie === null ? null : String(data.cuenta_cie),
-    clave_bancaria: data.clave_bancaria === null ? null : String(data.clave_bancaria),
-    beneficiario: data.beneficiario === null ? null : String(data.beneficiario),
-    activo: Boolean(data.activo),
-    created_at: data.created_at ? String(data.created_at) : null,
+  return mapCuenta(data);
+}
+
+export async function updateCuentaAction(id: string, cuenta: CuentaUpdatePayload): Promise<Cuenta> {
+  const supabase = createServerSupabaseClient();
+
+  const payload = {
+    proveedor: cuenta.proveedor,
+    giro: cuenta.giro,
+    direccion: cuenta.direccion,
+    telefono: cuenta.telefono,
+    banco: cuenta.banco,
+    referencia: cuenta.referencia,
+    cuenta_cie: cuenta.cuenta_cie,
+    clave_bancaria: cuenta.clave_bancaria,
+    beneficiario: cuenta.beneficiario,
+    activo: cuenta.activo ?? true,
   };
+
+  const { data, error } = await supabase
+    .from("cuentas")
+    .update(payload)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("❌ Error en updateCuentaAction:", error);
+    throw new Error("No se pudo actualizar la cuenta bancaria.");
+  }
+
+  revalidatePath("/cuentas");
+
+  return mapCuenta(data);
+}
+
+export async function deleteCuentaAction(id: string): Promise<void> {
+  const supabase = createServerSupabaseClient();
+
+  const { error } = await supabase.from("cuentas").delete().eq("id", id);
+
+  if (error) {
+    console.error("❌ Error en deleteCuentaAction:", error);
+    throw new Error("No se pudo eliminar la cuenta bancaria.");
+  }
+
+  revalidatePath("/cuentas");
 }
