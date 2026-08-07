@@ -63,8 +63,8 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur-md">
       <div className="mx-auto px-4 py-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex w-full flex-wrap items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
             <Link href="/" className="block">
               <h1 className="text-lg sm:text-2xl font-bold bg-linear-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                 📦 Control de Almacén
@@ -75,7 +75,7 @@ export default function Header() {
 
           {/* Desktop nav: visible only when session exists; items filtered by level */}
           {session && (
-            <nav className="hidden md:flex items-center gap-2">
+            <nav className="hidden md:flex flex-1 flex-wrap items-center justify-end gap-2">
               {navItems
                 .filter((item) => {
                   const userLevel = session?.nivel_jerarquia ?? 99;
@@ -139,7 +139,7 @@ export default function Header() {
 
           {/* Mobile controls: only show when session exists */}
           {session && (
-            <div className="md:hidden flex items-center gap-2">
+            <div className="md:hidden flex flex-wrap items-center gap-2 justify-end w-full">
               <div className="relative">
                 <button
                   type="button"
@@ -192,7 +192,7 @@ export default function Header() {
 
           {/* Mobile login button when no session */}
           {!session && (
-            <Link href="/login" className="md:hidden inline-flex h-10 items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700">
+            <Link href="/login" className="md:hidden inline-flex h-10 min-w-[8rem] items-center justify-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700">
               Ingresar
             </Link>
           )}
