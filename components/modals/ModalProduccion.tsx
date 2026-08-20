@@ -66,12 +66,9 @@ export default function ModalProduccion({
   const [empleadoEncontrado, setEmpleadoEncontrado] = useState<Empleado | null>(null);
   const [esNuevoEmpleado, setEsNuevoEmpleado] = useState(false);
   const [nombreNuevoEmpleado, setNombreNuevoEmpleado] = useState("");
-  
+  const [searchBy, setSearchBy] = useState<'codigo' | 'nombre'>('codigo');
+
   const [pesoIngresado, setPesoIngresado] = useState("");
-  
-  const [esPareja, setEsPareja] = useState(false);
-  const [codigoEmpleado2, setCodigoEmpleado2] = useState("");
-  const [empleado2, setEmpleado2] = useState<Empleado | null>(null);
 
   // Buscar primer empleado
   const handleKeyDownCodigo = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -86,14 +83,13 @@ export default function ModalProduccion({
     }
   };
 
-  // Buscar segundo empleado (pareja)
+  // Si se cambia el método de búsqueda, limpiar estados relevantes
   useEffect(() => {
-    if (codigoEmpleado2.trim().length >= 3) {
-      setEmpleado2({ id: codigoEmpleado2, nombre: `OPERADOR ${codigoEmpleado2}` });
-    } else {
-      setEmpleado2(null);
-    }
-  }, [codigoEmpleado2]);
+    setCodigoEmpleado("");
+    setEmpleadoEncontrado(null);
+    setEsNuevoEmpleado(false);
+    setNombreNuevoEmpleado("");
+  }, [searchBy]);
 
   const handleSubmit = () => {
     if (!pesoIngresado) return;
@@ -101,7 +97,7 @@ export default function ModalProduccion({
     if (onGuardarPesaje) {
       onGuardarPesaje({
         empleadoId: empleadoEncontrado ? empleadoEncontrado.id : codigoEmpleado,
-        nombre: empleadoEncontrado ? empleadoEncontrado.nombre : nombreNuevoEmpleado || "Sin nombre",
+        nombre: empleadoEncontrado ? empleadoEncontrado.nombre : nombreNuevoEmpleado || codigoEmpleado || "Sin nombre",
         lote: lote.camion,
         producto: "Producto Base",
         peso: Number(pesoIngresado)
@@ -118,9 +114,6 @@ export default function ModalProduccion({
     setEsNuevoEmpleado(false);
     setNombreNuevoEmpleado("");
     setPesoIngresado("");
-    setEsPareja(false);
-    setCodigoEmpleado2("");
-    setEmpleado2(null);
   };
 
   if (!isOpen) return null;
@@ -137,35 +130,51 @@ export default function ModalProduccion({
         {/* CUERPO */}
         <div className="flex-1 p-4 overflow-y-auto bg-slate-50 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            
-            {/* Operador principal */}
-            <section className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm">
-              <h3 className="mb-2 text-xs font-bold uppercase text-slate-500">👷 Empleado</h3>
-              <input
-                ref={inputCodigoRef}
-                autoFocus
-                type="text"
-                value={codigoEmpleado}
-                onChange={(e) => setCodigoEmpleado(e.target.value)}
-                onKeyDown={handleKeyDownCodigo}
-                disabled={!!empleadoEncontrado || esNuevoEmpleado}
-                placeholder="Escanear código..."
-                className="w-full px-4 py-3 text-lg text-slate-900 bg-slate-50 border-2 border-slate-200 rounded-lg focus:border-emerald-500 outline-none transition-all"
-              />
 
-              {esNuevoEmpleado && (
-                <div className="mt-4">
-                  <label className="block mb-2 text-sm font-semibold text-slate-600">
-                    Nombre del empleado
-                  </label>
+            {/* Método de búsqueda */}
+            <section className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm">
+              <h3 className="mb-2 text-xs font-bold uppercase text-slate-500">👷 Buscar empleado</h3>
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={() => setSearchBy('codigo')}
+                  className={`px-3 py-1 rounded-md text-sm ${searchBy === 'codigo' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                  Código
+                </button>
+                <button
+                  onClick={() => setSearchBy('nombre')}
+                  className={`px-3 py-1 rounded-md text-sm ${searchBy === 'nombre' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                  Nombre
+                </button>
+              </div>
+
+              {searchBy === 'codigo' ? (
+                <>
+                  <input
+                    ref={inputCodigoRef}
+                    autoFocus
+                    type="text"
+                    value={codigoEmpleado}
+                    onChange={(e) => setCodigoEmpleado(e.target.value)}
+                    onKeyDown={handleKeyDownCodigo}
+                    disabled={!!empleadoEncontrado}
+                    placeholder="Escanear código y presionar Enter..."
+                    className="w-full px-4 py-3 text-lg text-slate-900 bg-slate-50 border-2 border-slate-200 rounded-lg focus:border-emerald-500 outline-none transition-all"
+                  />
+                  {empleadoEncontrado && (
+                    <p className="mt-2 text-sm text-emerald-600 font-semibold">{empleadoEncontrado.nombre}</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <label className="block mb-2 text-sm font-semibold text-slate-600">Nombre</label>
                   <input
                     type="text"
                     value={nombreNuevoEmpleado}
                     onChange={(e) => setNombreNuevoEmpleado(e.target.value)}
-                    placeholder="Ingresar nombre..."
+                    placeholder="Ingresar nombre completo..."
                     className="w-full px-4 py-3 text-lg text-slate-900 bg-slate-50 border-2 border-slate-200 rounded-lg focus:border-emerald-500 outline-none transition-all"
                   />
-                </div>
+                </>
               )}
             </section>
 
@@ -183,72 +192,22 @@ export default function ModalProduccion({
             </section>
           </div>
 
-          {/* Segundo operador (pareja) */}
-          {esPareja && (
-            <section className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm">
-              <h3 className="mb-2 text-xs font-bold uppercase text-slate-500">👥 Segundo empleado</h3>
-              <input
-                type="text"
-                value={codigoEmpleado2}
-                onChange={(e) => setCodigoEmpleado2(e.target.value)}
-                placeholder="Escanear código..."
-                className="w-full px-4 py-3 text-lg text-slate-900 bg-slate-50 border-2 border-slate-200 rounded-lg focus:border-emerald-500 outline-none transition-all"
-              />
-              {empleado2 && (
-                <p className="mt-2 text-sm text-emerald-600 font-semibold">
-                  {empleado2.nombre}
-                </p>
-              )}
+          {/* RESUMEN */}
+          {pesoIngresado && (
+            <section className="p-4 bg-slate-800 rounded-xl text-white shadow-lg">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Resumen de carga</h3>
+                <span className="text-xl font-black">{pesoIngresado} KG</span>
+              </div>
+
+              <div className="space-y-2 border-t border-slate-700 pt-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-300">{empleadoEncontrado?.nombre || nombreNuevoEmpleado || "Operador"}</span>
+                  <strong className="text-emerald-400">{Number(pesoIngresado).toFixed(2)} KG</strong>
+                </div>
+              </div>
             </section>
           )}
-
-          {/* Toggle para activar pareja */}
-            <div 
-            onClick={() => setEsPareja(!esPareja)} 
-            className={`relative inline-flex h-6 w-11 items-center rounded-full cursor-pointer transition-colors ${
-                esPareja ? "bg-emerald-600" : "bg-slate-300"
-            }`}
-            >
-            <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                esPareja ? "translate-x-6" : "translate-x-1"
-                }`}
-            />
-            </div>
-            <span className="ml-3 text-sm font-medium text-slate-700">Registrar en pareja</span>
-{/* RESUMEN - Integrado y con cálculo correcto */}
-{pesoIngresado && (
-  <section className="p-4 bg-slate-800 rounded-xl text-white shadow-lg">
-    <div className="flex justify-between items-center mb-3">
-      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Resumen de carga</h3>
-      <span className="text-xl font-black">{pesoIngresado} KG</span>
-    </div>
-    
-    <div className="space-y-2 border-t border-slate-700 pt-3">
-      <div className="flex justify-between text-sm">
-        <span className="text-slate-300">
-          {empleadoEncontrado?.nombre || nombreNuevoEmpleado || "Operador 1"}
-        </span>
-        <strong className="text-emerald-400">
-          {esPareja 
-            ? (Number(pesoIngresado) / 2).toFixed(2) 
-            : Number(pesoIngresado).toFixed(2)} KG
-        </strong>
-      </div>
-      
-      {esPareja && (
-        <div className="flex justify-between text-sm">
-          <span className="text-slate-300">
-            {empleado2?.nombre || "Operador 2"}
-          </span>
-          <strong className="text-blue-400">
-            {(Number(pesoIngresado) / 2).toFixed(2)} KG
-          </strong>
-        </div>
-      )}
-    </div>
-  </section>
-)}
         </div>
 
         {/* FOOTER */}

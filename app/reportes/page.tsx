@@ -9,6 +9,8 @@ export default function ReportesPage() {
   const [totals, setTotals] = useState({ tarimas: 0, peso: 0, movimientos: 0 });
   const [loading, setLoading] = useState(true);
   const [filtroActivo, setFiltroActivo] = useState<"todos" | "7dias" | "mes">("todos");
+  const [cortes, setCortes] = useState<any[]>([]);
+  const [loadingCortes, setLoadingCortes] = useState(true);
 
   // 1. Estado para controlar la visibilidad del modal de cierre
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -31,7 +33,24 @@ export default function ReportesPage() {
       }
     }
 
+    async function loadCortes() {
+      try {
+        setLoadingCortes(true);
+        const res = await fetch("/api/cortes");
+        const json = await res.json();
+        if (json.ok) {
+          setCortes(json.data || []);
+        }
+      } catch (err) {
+        console.error("Error al cargar cortes:", err);
+        setCortes([]);
+      } finally {
+        setLoadingCortes(false);
+      }
+    }
+
     loadReportes();
+    loadCortes();
     return () => {
       mounted = false;
     };
@@ -99,22 +118,22 @@ export default function ReportesPage() {
               <h2 className="text-lg sm:text-xl font-bold text-slate-900">Historial Reciente</h2>
               <p className="text-xs sm:text-sm text-slate-500">Últimos informes e incidencias generadas en planta.</p>
             </div>
-            
+
             {/* Filtros por Rango de Fecha */}
             <div className="flex flex-wrap gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200 self-start md:self-auto">
-              <button 
+              <button
                 onClick={() => setFiltroActivo("todos")}
                 className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${filtroActivo === "todos" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"}`}
               >
                 Todos
               </button>
-              <button 
+              <button
                 onClick={() => setFiltroActivo("7dias")}
                 className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${filtroActivo === "7dias" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"}`}
               >
                 Últimos 7 días
               </button>
-              <button 
+              <button
                 onClick={() => setFiltroActivo("mes")}
                 className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${filtroActivo === "mes" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"}`}
               >
@@ -168,6 +187,70 @@ export default function ReportesPage() {
             </table>
           </div>
         </section>
+
+        <section className="mt-8 rounded-2xl bg-white border border-slate-200 p-4 sm:p-6 shadow-xs">
+          <div className="mb-5">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900">Cortes realizados</h2>
+            <p className="text-xs sm:text-sm text-slate-500">Historial de los cortes de producción ya efectuados.</p>
+          </div>
+
+          {loadingCortes ? (
+            <div className="text-sm text-slate-500">Cargando cortes...</div>
+          ) : cortes.length === 0 ? (
+            <div className="text-sm text-slate-500">No hay cortes realizados todavía.</div>
+          ) : (
+            <div className="space-y-4">
+              {cortes.map((corte) => (
+                <div key={corte.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">Corte #{corte.id}</p>
+                      <p className="text-xs text-slate-500">{new Date(corte.fecha_corte).toLocaleString("es-MX")}</p>
+                    </div>
+                    <div className="flex gap-3 text-sm">
+                      <span className="rounded-full bg-emerald-100 text-emerald-700 px-2.5 py-1 font-semibold">{Number(corte.total_kilos || 0).toFixed(2)} kg</span>
+                      <span className="rounded-full bg-slate-200 text-slate-700 px-2.5 py-1 font-semibold">{Number(corte.total_movimientos || 0)} movimientos</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="min-w-full text-left text-xs border border-slate-200 rounded-lg overflow-hidden bg-slate-100 text-slate-800">
+                      <thead className="bg-slate-800 text-white">
+                        <tr>
+                          <th className="px-3 py-2">Operador</th>
+                          <th className="px-3 py-2">Pesajes</th>
+                          <th className="px-3 py-2">Total KG</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-300 bg-slate-100 text-slate-800">
+                        {(() => {
+                          const resumenPorOperador = new Map<string, { count: number; peso: number }>();
+
+                          for (const item of corte.detalle_pesajes || []) {
+                            const nombre = item.nombre || "Sin nombre";
+                            const actual = resumenPorOperador.get(nombre) || { count: 0, peso: 0 };
+                            actual.count += 1;
+                            actual.peso += Number(item.peso || 0);
+                            resumenPorOperador.set(nombre, actual);
+                          }
+
+                          return Array.from(resumenPorOperador.entries()).map(([nombre, valores]) => (
+                            <tr key={`${corte.id}-${nombre}`} className="hover:bg-slate-200">
+                              <td className="px-3 py-2 text-slate-800">{nombre}</td>
+                              <td className="px-3 py-2 font-semibold text-slate-800">{valores.count}</td>
+                              <td className="px-3 py-2 font-semibold text-slate-800">{Number(valores.peso).toFixed(2)} kg</td>
+                            </tr>
+                          ));
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
       <ModalCorteDiario
         isOpen={isModalOpen}
         onClose={handleCorteExitoso}
