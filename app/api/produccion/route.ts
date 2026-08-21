@@ -75,6 +75,57 @@ export async function POST(req: Request) {
   }
 }
 
+export async function PUT(req: Request) {
+  try {
+    const body = await req.json();
+    const id = body.id ?? body.pesajeId;
+
+    if (!id) {
+      return NextResponse.json({ ok: false, error: "Falta el id del pesaje." }, { status: 400 });
+    }
+
+    const updates: Record<string, any> = {};
+    if (body.nombre !== undefined) updates.nombre = body.nombre;
+    if (body.lote !== undefined) updates.lote = body.lote;
+    if (body.producto !== undefined) updates.producto = body.producto;
+    if (body.peso !== undefined) updates.peso = Number(body.peso);
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ ok: false, error: "No se enviaron cambios para actualizar." }, { status: 400 });
+    }
+
+    const supabase = createServerSupabaseClient();
+    const { data, error } = await supabase
+      .from("pesajes_produccion")
+      .update(updates)
+      .eq("id", Number(id))
+      .select()
+      .single();
+
+    if (error) {
+      console.error("❌ Error al actualizar pesaje:", error);
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      data: {
+        id: String(data.id),
+        empleadoId: data.empleado_id ?? "",
+        nombre: data.nombre ?? "Sin nombre",
+        lote: data.lote ?? "Sin lote",
+        producto: data.producto ?? "Producto Base",
+        peso: Number(data.peso ?? 0),
+        fecha: data.created_at ? new Date(data.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+        numeroPesaje: Number(data.numero_pesaje ?? 0),
+      }
+    });
+  } catch (error) {
+    console.error("❌ Error en PUT /api/produccion:", error);
+    return NextResponse.json({ ok: false, error: String(error) }, { status: 500 });
+  }
+}
+
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);

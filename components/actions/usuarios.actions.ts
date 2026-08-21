@@ -16,6 +16,12 @@ export type Perfil = {
   rol: "Administrador" | "Encargado" | "Operador";
 };
 
+export type Despulpador = {
+  id: string;
+  id_despulpador?: string | null;
+  nombre_completo: string | null;
+};
+
 function getErrorMessage(error: unknown) {
   if (!error) return "Error desconocido.";
 
@@ -60,6 +66,26 @@ export async function getUsuariosAction(): Promise<Perfil[]> {
   }
 
   return data as Perfil[];
+}
+
+export async function getDespulpadoresAction(): Promise<Despulpador[]> {
+  const supabase = createServerSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("despulpadores")
+    .select("id_despulpador, nombre_completo")
+    .order("nombre_completo", { ascending: true });
+
+  if (error) {
+    console.error("❌ Error en getDespulpadoresAction:", error.message);
+    throw new Error("No se pudo conectar con la base de datos de despulpadores.");
+  }
+
+  return (data ?? []).map((item: any) => ({
+    id: String(item.id_despulpador ?? item.id ?? ""),
+    id_despulpador: item.id_despulpador ? String(item.id_despulpador) : null,
+    nombre_completo: item.nombre_completo ?? "Sin nombre",
+  }));
 }
 
 /**

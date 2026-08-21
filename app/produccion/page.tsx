@@ -1,6 +1,7 @@
 "use client";
 
 import ModalProduccion, { RegistroPesaje } from '@/components/modals/ModalProduccion';
+import { getDespulpadoresAction } from '@/components/actions/usuarios.actions';
 import { exportToCSV } from '@/lib/excel';
 import React, { useState, useMemo, useEffect } from 'react';
 import { operatorSummaryRows } from '@/lib/excel';
@@ -44,7 +45,92 @@ export default function ProduccionPage() {
   const [registros, setRegistros] = useState<RegistroPesaje[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [historialOperador, setHistorialOperador] = useState<{ nombre: string; entries: RegistroPesaje[] } | null>(null);
+  const [pesoEditado, setPesoEditado] = useState<Record<string, string>>({});
+  const [empleadosProduccion, setEmpleadosProduccion] = useState<Array<{ id: string; nombre: string; numero_empleado: string }>>([]);
   const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; title: string; message: string; onConfirm: () => Promise<void> | void } | null>(null);
+
+  useEffect(() => {
+    const cargarEmpleadosProduccion = async () => {
+      try {
+        const usuarios = await getDespulpadoresAction();
+        const lista = usuarios
+          .filter((usuario) => usuario.nombre_completo)
+          .map((usuario) => ({
+            id: String(usuario.id_despulpador ?? usuario.id ?? ''),
+            nombre: String(usuario.nombre_completo || 'Sin nombre'),
+            numero_empleado: String(usuario.id_despulpador ?? usuario.id ?? '').trim(),
+          }))
+          .filter((usuario) => usuario.id && usuario.nombre);
+
+        setEmpleadosProduccion(lista);
+      } catch (err) {
+        console.error('Error cargando usuarios de producción:', err);
+        setEmpleadosProduccion([]);
+      }
+    };
+
+    cargarEmpleadosProduccion();
+  }, []);
+
+  const editarRegistro = async (id: string, cambios: Partial<RegistroPesaje>) => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/produccion', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...cambios })
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || 'No se pudo actualizar el pesaje.');
+      }
+
+      await cargarRegistros();
+      showToast('Pesaje actualizado correctamente.', 'success');
+    } catch (err) {
+      console.error('Error actualizando pesaje:', err);
+      showToast(err instanceof Error ? err.message : 'No se pudo actualizar el pesaje.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const abrirHistorialOperador = (nombre: string) => {
+    const entries = [...registros]
+      .filter((registro) => normalizeOperatorName(registro.nombre || 'Sin nombre') === normalizeOperatorName(nombre))
+      .sort((a, b) => Number(new Date(b.fecha || 0)) - Number(new Date(a.fecha || 0)));
+
+    setHistorialOperador({ nombre, entries });
+    setPesoEditado({});
+  };
+
+  const guardarPesoDesdeHistorial = async (registro: RegistroPesaje) => {
+    const nuevoPeso = Number(pesoEditado[registro.id] ?? registro.peso);
+
+    if (Number.isNaN(nuevoPeso)) {
+      showToast('El peso no es válido.', 'error');
+      return;
+    }
+
+    await editarRegistro(registro.id, {
+      nombre: registro.nombre,
+      lote: registro.lote,
+      producto: registro.producto,
+      peso: nuevoPeso,
+    });
+
+    if (historialOperador) {
+      const siguiente = {
+        nombre: historialOperador.nombre,
+        entries: historialOperador.entries.map((item) =>
+          item.id === registro.id ? { ...item, peso: nuevoPeso } : item
+        )
+      };
+      setHistorialOperador(siguiente);
+    }
+  };
 
   const siguienteNumeroPesaje = registros.length + 1;
 
@@ -122,6 +208,7 @@ export default function ProduccionPage() {
   };
 
   const abrirConfirmacionEliminar = (title: string, message: string, onConfirm: () => Promise<void> | void) => {
+    setHistorialOperador(null);
     setConfirmDelete({ open: true, title, message, onConfirm });
   };
 
@@ -246,7 +333,11 @@ export default function ProduccionPage() {
           {calcularTotales(registros).map(t => {
             const registrosOperador = registros.filter(r => normalizeOperatorName(r.nombre || 'Sin nombre') === normalizeOperatorName(t.nombre));
             return (
-              <div key={t.nombre} className="p-3 bg-white rounded-lg border shadow-sm flex justify-between items-center gap-3">
+              <div
+                key={t.nombre}
+                onClick={() => abrirHistorialOperador(t.nombre)}
+                className="cursor-pointer p-3 bg-white rounded-lg border shadow-sm flex justify-between items-center gap-3 transition hover:border-emerald-200 hover:shadow-md"
+              >
                 <div>
                   <div className="text-sm font-medium text-slate-600">{t.nombre}</div>
                   <div className="text-xs text-slate-400">{t.count} pesajes</div>
@@ -259,7 +350,8 @@ export default function ProduccionPage() {
 
                   {registrosOperador.length > 0 && (
                     <button
-                      onClick={() => {
+                      onClick={(event) => {
+                        event.stopPropagation();
                         const ids = registrosOperador.map(r => r.id);
                         abrirConfirmacionEliminar(
                           'Eliminar pesajes',
@@ -321,10 +413,72 @@ export default function ProduccionPage() {
           </div>
         )}
 
+        {historialOperador && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">Historial de {historialOperador.nombre}</h3>
+                  <p className="text-xs text-slate-500">Haz clic en un registro para corregir el peso.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHistorialOperador(null)}
+                  className="rounded-lg border border-slate-200 px-2 py-1 text-sm text-slate-600"
+                >
+                  Cerrar
+                </button>
+              </div>
+
+              <div className="max-h-[70vh] space-y-3 overflow-y-auto p-4">
+                {historialOperador.entries.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                    No hay pesajes para este operador.
+                  </div>
+                ) : (
+                  historialOperador.entries.map((registro) => (
+                    <div key={registro.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{registro.fecha}</p>
+                          <p className="text-sm text-slate-600">Lote: {registro.lote || 'Sin especificar'}</p>
+                        </div>
+                        <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
+                          {Number(registro.peso).toFixed(2)} KG
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex items-center gap-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={pesoEditado[registro.id] ?? String(registro.peso)}
+                          onChange={(event) =>
+                            setPesoEditado((prev) => ({ ...prev, [registro.id]: event.target.value }))
+                          }
+                          className="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500"
+                        />
+                        <span className="text-sm text-slate-500">kg</span>
+                        <button
+                          type="button"
+                          onClick={() => guardarPesoDesdeHistorial(registro)}
+                          className="ml-auto rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
+                        >
+                          Guardar
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {confirmDelete?.open && (
           <div className="fixed inset-x-0 top-4 z-50 flex justify-center px-3 sm:px-4">
             <div className="w-full max-w-[92vw] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.18)] sm:max-w-md">
-              <div className="bg-gradient-to-r from-red-50 to-rose-50 px-4 pb-3 pt-4 sm:px-5">
+              <div className="bg-linear-to-r from-red-50 to-rose-50 px-4 pb-3 pt-4 sm:px-5">
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600 ring-6 ring-red-50">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden="true">
@@ -366,10 +520,17 @@ export default function ProduccionPage() {
           isOpen={isModalOpen} 
           onClose={() => setIsModalOpen(false)} 
           onGuardarPesaje={agregarRegistro}
+          onEditarPesaje={editarRegistro}
+          historialRegistros={registros}
           siguienteNumero={siguienteNumeroPesaje}
           existingNames={Array.from(new Set(registros.map(r => r.nombre).filter(Boolean)))}
+          empleadosDisponibles={empleadosProduccion.map((usuario) => ({
+            id: usuario.id,
+            nombre: usuario.nombre || 'Sin nombre',
+            numero_empleado: usuario.numero_empleado || '',
+          }))}
         />
-      </div>
+      </div>  
     </div>
   );
 }

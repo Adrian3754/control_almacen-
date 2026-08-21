@@ -51,6 +51,27 @@ export default function UsuariosPage() {
     rol: "Operador" as Perfil["rol"]
   });
 
+  const [busquedaProduccion, setBusquedaProduccion] = useState("");
+
+  const isProduccionUser = (user: Perfil) => {
+    const cargo = (user.cargo || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return cargo.includes("produccion") || cargo.includes("produccion");
+  };
+
+  const usuariosProduccion = usuarios
+    .filter(isProduccionUser)
+    .filter((user) => {
+      const query = busquedaProduccion.trim().toLowerCase();
+      if (!query) return true;
+
+      const nombre = (user.nombre || "").toLowerCase();
+      const numero = (user.numero_empleado || "").toLowerCase();
+      const ultimos = (user.numero_empleado || "").replace(/\D/g, "").slice(-6);
+
+      return nombre.includes(query) || numero.includes(query) || ultimos.includes(query.replace(/\D/g, ""));
+    })
+    .sort((a, b) => String(a.nombre || "").localeCompare(String(b.nombre || "")));
+
   async function loadUsuarios() {
     try {
       const data = await getUsuariosAction();
@@ -145,6 +166,59 @@ export default function UsuariosPage() {
         </div>
       ) : (
         <div className="grid gap-8 lg:grid-cols-3 items-start">
+          <section className="bg-white p-4 sm:p-6 rounded-3xl border border-slate-200 shadow-sm lg:col-span-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg sm:text-xl font-medium text-slate-800">Usuarios de Producción</h2>
+                <p className="text-xs text-slate-500">Busca por nombre o por los últimos dígitos del empleado.</p>
+              </div>
+              <label className="w-full sm:max-w-xs">
+                <span className="sr-only">Buscar usuario de producción</span>
+                <input
+                  type="search"
+                  value={busquedaProduccion}
+                  onChange={(e) => setBusquedaProduccion(e.target.value)}
+                  placeholder="Buscar nombre o últimos dígitos..."
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-sky-500 focus:bg-white"
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {usuariosProduccion.length === 0 ? (
+                <div className="col-span-full rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+                  No hay usuarios de producción registrados.
+                </div>
+              ) : (
+                usuariosProduccion.map((user) => (
+                  <div key={user.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm transition hover:border-sky-200 hover:bg-sky-50/40">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-800">{user.nombre || "Sin nombre"}</p>
+                        <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-500">Producción</p>
+                      </div>
+                      <span className="rounded-full bg-sky-100 px-2 py-1 text-[10px] font-semibold text-sky-700">
+                        {user.rol || "Operador"}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wide text-slate-500">Últimos dígitos</p>
+                      <p className="mt-1 font-mono text-sm font-bold text-slate-800">
+                        {user.numero_empleado ? user.numero_empleado.replace(/\D/g, "").slice(-4) || "—" : "—"}
+                      </p>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
+                      <span>Empleado</span>
+                      <span className="font-mono text-slate-700">{user.numero_empleado || "Sin número"}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+
           {showInvitaciones && (
             <section className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm lg:col-span-1 space-y-4">
               <div className="flex items-start justify-between">
