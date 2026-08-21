@@ -74,3 +74,30 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: String(error) }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ ok: false, error: "Falta el id del pesaje." }, { status: 400 });
+    }
+
+    const supabase = createServerSupabaseClient();
+    const { error } = await supabase
+      .from("pesajes_produccion")
+      .delete()
+      .eq("id", Number(id));
+
+    if (error) {
+      console.error("❌ Error al eliminar pesaje:", error);
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("❌ Error en DELETE /api/produccion:", error);
+    return NextResponse.json({ ok: false, error: String(error) }, { status: 500 });
+  }
+}

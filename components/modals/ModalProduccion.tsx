@@ -44,6 +44,7 @@ export interface ModalProduccionProps {
   kilosProcesados?: number;
   loading?: boolean;
   movimientos?: Movimiento[];
+  existingNames?: string[];
 }
 
 // -------------------------------------------------------------
@@ -58,7 +59,8 @@ export default function ModalProduccion({
   loading = false,
   movimientos = [],
   siguienteNumero = 1,
-  onGuardarPesaje
+  onGuardarPesaje,
+  existingNames = []
 }: ModalProduccionProps) {
   
   const inputCodigoRef = useRef<HTMLInputElement>(null);
@@ -69,6 +71,19 @@ export default function ModalProduccion({
   const [searchBy, setSearchBy] = useState<'codigo' | 'nombre'>('codigo');
 
   const [pesoIngresado, setPesoIngresado] = useState("");
+
+  const normalizeText = (value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+
+  const nombresCoincidentes = existingNames.filter((nombre) => {
+    const consulta = normalizeText(nombreNuevoEmpleado);
+    if (!consulta) return false;
+    return normalizeText(nombre).includes(consulta);
+  }).slice(0, 6);
 
   // Buscar primer empleado
   const handleKeyDownCodigo = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -90,6 +105,31 @@ export default function ModalProduccion({
     setEsNuevoEmpleado(false);
     setNombreNuevoEmpleado("");
   }, [searchBy]);
+
+  useEffect(() => {
+    if (searchBy !== 'nombre') return;
+
+    const consulta = normalizeText(nombreNuevoEmpleado);
+    if (!consulta) {
+      setEmpleadoEncontrado(null);
+      setEsNuevoEmpleado(false);
+      return;
+    }
+
+    const coincidencias = existingNames.filter((nombre) => normalizeText(nombre).includes(consulta));
+
+    if (coincidencias.length === 1) {
+      const nombre = coincidencias[0];
+      setEmpleadoEncontrado({ id: nombre, nombre });
+      setEsNuevoEmpleado(false);
+      return;
+    }
+
+    if (coincidencias.length > 1) {
+      setEmpleadoEncontrado(null);
+      setEsNuevoEmpleado(true);
+    }
+  }, [searchBy, nombreNuevoEmpleado, existingNames]);
 
   const handleSubmit = () => {
     if (!pesoIngresado) return;
@@ -174,6 +214,25 @@ export default function ModalProduccion({
                     placeholder="Ingresar nombre completo..."
                     className="w-full px-4 py-3 text-lg text-slate-900 bg-slate-50 border-2 border-slate-200 rounded-lg focus:border-emerald-500 outline-none transition-all"
                   />
+
+                  {nombresCoincidentes.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {nombresCoincidentes.map((nombre) => (
+                        <button
+                          key={nombre}
+                          type="button"
+                          onClick={() => {
+                            setNombreNuevoEmpleado(nombre);
+                            setEmpleadoEncontrado({ id: nombre, nombre });
+                            setEsNuevoEmpleado(false);
+                          }}
+                          className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-left text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+                        >
+                          {nombre}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </>
               )}
             </section>
