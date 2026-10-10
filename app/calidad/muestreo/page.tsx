@@ -53,7 +53,7 @@ export default function ControlCalidadPage() {
       <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
         
         {/* Encabezado Principal */}
-        <section className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:p-6 shadow-sm">
+        <section className="mb-6 rounded-2xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-5 shadow-sm sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <h1 className="text-xl sm:text-3xl font-bold text-slate-900 tracking-tight">
@@ -66,7 +66,7 @@ export default function ControlCalidadPage() {
             <button
               type="button"
               onClick={() => setModalOpen(true)}
-              className="w-full sm:w-auto shrink-0 rounded-xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-xs transition hover:bg-sky-700 active:scale-98 text-center"
+              className="w-full sm:w-auto shrink-0 rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white shadow-xs transition hover:bg-emerald-900 active:scale-98 text-center"
             >
               Nuevo Registro
             </button>
@@ -98,7 +98,7 @@ export default function ControlCalidadPage() {
         </section>
 
         {/* Tabla con Columna Lote integrada */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-xs">
+        <section className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-xs sm:p-6">
           <div className="mb-4 sm:mb-6">
             <h2 className="text-lg sm:text-xl font-bold text-slate-900">Datos del Muestreo Activo</h2>
             <p className="text-xs sm:text-sm text-slate-500">Historial de pesajes vinculados a su lote correspondiente.</p>
@@ -106,7 +106,7 @@ export default function ControlCalidadPage() {
 
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="min-w-[1050px] w-full divide-y divide-slate-200 text-left text-xs sm:text-sm">
-              <thead className="bg-slate-800 text-white select-none">
+              <thead className="bg-emerald-950 text-white select-none">
                 <tr>
                   <th className="px-4 py-3 font-medium tracking-wide text-slate-100">Fecha</th>
                   <th className="px-4 py-3 font-medium tracking-wide text-slate-100">Hora</th>
@@ -136,7 +136,7 @@ export default function ControlCalidadPage() {
                       <td className="px-4 py-3.5 text-slate-500 whitespace-nowrap">{item.hora}</td>
                       
                       <td className="px-4 py-3.5 font-bold text-slate-900 whitespace-nowrap bg-slate-50/30">
-                        <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-semibold text-purple-700 border border-purple-100">
+                        <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 border border-amber-100">
                           🏷️ {item.codigoLote}
                         </span>
                       </td>

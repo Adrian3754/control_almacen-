@@ -94,8 +94,8 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-transparent">
-      <div className="mx-auto max-w-7xl p-6 sm:p-8">
-        <section className="mb-8 rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
+      <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+        <section className="mb-6 rounded-3xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-5 shadow-sm sm:mb-8 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h1 className="text-3xl font-semibold text-slate-900">Sorteo de fruta</h1>
@@ -106,7 +106,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => setModalOpen(true)}
-              className="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
+              className="min-h-11 rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-900"
             >
               Nuevo sorteo
             </button>
@@ -129,7 +129,7 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm sm:p-6">
           <div className="mb-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-xl font-semibold text-slate-900">Listado de sorteos</h2>
@@ -139,7 +139,7 @@ export default function DashboardPage() {
 
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-              <thead className="bg-slate-50">
+              <thead className="bg-emerald-50/70">
                 <tr>
                   <th className="px-4 py-3 font-medium text-slate-600">ID</th>
                   <th className="px-4 py-3 font-medium text-slate-600">Lote</th>
@@ -163,7 +163,7 @@ export default function DashboardPage() {
                           item.estado === "Completado"
                             ? "bg-emerald-100 text-emerald-700"
                             : item.estado === "En proceso"
-                              ? "bg-sky-100 text-sky-700"
+                              ? "bg-amber-100 text-amber-800"
                               : "bg-amber-100 text-amber-700"
                         }`}
                       >
@@ -202,7 +202,7 @@ export default function DashboardPage() {
                   <input
                     value={lote}
                     onChange={(event) => setLote(event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                     placeholder="Ej. LOT-104"
                   />
                 </label>
@@ -211,7 +211,7 @@ export default function DashboardPage() {
                   <input
                     value={fruta}
                     onChange={(event) => setFruta(event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                   />
                 </label>
                 <label className="space-y-2">
@@ -221,7 +221,7 @@ export default function DashboardPage() {
                     min={1}
                     value={kilos}
                     onChange={(event) => setKilos(Number(event.target.value))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                   />
                 </label>
                 <label className="space-y-2">
@@ -229,7 +229,7 @@ export default function DashboardPage() {
                   <select
                     value={estado}
                     onChange={(event) => setEstado(event.target.value as EstadoSorteo)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                   >
                     <option value="Pendiente">Pendiente</option>
                     <option value="En proceso">En proceso</option>
@@ -241,7 +241,7 @@ export default function DashboardPage() {
                   <input
                     value={responsable}
                     onChange={(event) => setResponsable(event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                     placeholder="Ej. Carlos"
                   />
                 </label>
@@ -258,7 +258,7 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={agregarSorteo}
-                  className="inline-flex items-center justify-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
+                  className="inline-flex items-center justify-center rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-900"
                 >
                   Guardar sorteo
                 </button>

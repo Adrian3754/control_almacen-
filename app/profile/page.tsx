@@ -48,7 +48,7 @@ export default function ProfilePage() {
       <div className="max-w-3xl mx-auto space-y-8">
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sky-100 text-2xl font-semibold text-sky-700">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-2xl font-semibold text-emerald-800">
               {session.nombre?.charAt(0).toUpperCase() ?? session.numero_empleado.charAt(0)}
             </div>
             <div>
@@ -76,7 +76,7 @@ export default function ProfilePage() {
                 value={nombre}
                 onChange={(event) => setNombre(event.target.value)}
                 placeholder="Ej. Ana García"
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
               />
             </div>
 
@@ -84,7 +84,7 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={handleSave}
-                className="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
+                className="rounded-full bg-emerald-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-900"
               >
                 Guardar cambios
               </button>

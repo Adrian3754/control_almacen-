@@ -127,7 +127,7 @@ export default function CalidadForm({ onCreated, onCancel }: Props) {
         ) : (
           <select
             required
-            className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-slate-900 bg-white shadow-xs focus:border-sky-500 focus:outline-hidden"
+            className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-slate-900 bg-white shadow-xs focus:border-emerald-600 focus:outline-hidden"
             value={form.loteId}
             onChange={e => setForm({ ...form, loteId: e.target.value })}
           >
@@ -145,7 +145,7 @@ export default function CalidadForm({ onCreated, onCancel }: Props) {
         <label className="block text-sm font-medium text-slate-700">Número de Mesa</label>
         <input 
           type="number" required
-          className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-slate-900 focus:border-sky-500 focus:outline-hidden"
+          className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-600 focus:outline-hidden"
           value={form.numeroMesa}
           onChange={e => setForm({...form, numeroMesa: e.target.value})}
         />
@@ -154,7 +154,7 @@ export default function CalidadForm({ onCreated, onCancel }: Props) {
         <label className="block text-sm font-medium text-slate-700">Peso Total Muestra (G)</label>
         <input 
           type="number" required step="0.01"
-          className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-slate-900 focus:border-sky-500 focus:outline-hidden"
+          className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-600 focus:outline-hidden"
           value={form.pesoMuestra}
           onChange={e => setForm({...form, pesoMuestra: e.target.value})}
         />
@@ -163,7 +163,7 @@ export default function CalidadForm({ onCreated, onCancel }: Props) {
         <label className="block text-sm font-medium text-slate-700">Peso Bueno (G)</label>
         <input 
           type="number" required step="0.01"
-          className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-slate-900 focus:border-sky-500 focus:outline-hidden"
+          className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-600 focus:outline-hidden"
           value={form.pesoBueno} 
           onChange={e => handlePesoBuenoChange(e.target.value)} 
         />
@@ -172,7 +172,7 @@ export default function CalidadForm({ onCreated, onCancel }: Props) {
         <label className="block text-sm font-medium text-slate-700">Peso Malo (G)</label>
         <input 
           type="number" required step="0.01"
-          className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-slate-900 focus:border-sky-500 focus:outline-hidden bg-slate-50 font-medium"
+          className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-600 focus:outline-hidden bg-slate-50 font-medium"
           value={form.pesoMalo}
           onChange={e => setForm({...form, pesoMalo: e.target.value})} 
         />
@@ -192,7 +192,7 @@ export default function CalidadForm({ onCreated, onCancel }: Props) {
       <div className="sm:col-span-2">
         <label className="block text-sm font-medium text-slate-700">Observaciones</label>
         <textarea 
-          className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 h-20 text-slate-900 resize-none focus:border-sky-500 focus:outline-hidden"
+          className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 h-20 text-slate-900 resize-none focus:border-emerald-600 focus:outline-hidden"
           value={form.observaciones}
           onChange={e => setForm({...form, observaciones: e.target.value})}
         />
@@ -210,7 +210,7 @@ export default function CalidadForm({ onCreated, onCancel }: Props) {
         <button 
           type="submit" 
           disabled={submitting || loadingLotes}
-          className="rounded-full bg-sky-600 px-5 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+          className="rounded-xl bg-emerald-800 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-900 disabled:opacity-50"
         >
           {submitting ? "Guardando..." : "Guardar Registro"}
         </button>

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { getEmployeeSession, saveEmployeeSession } from "@/lib/employeeSession";
+import { clearEmployeeSession, getEmployeeSession, saveEmployeeSession } from "@/lib/employeeSession";
 import { validateEmpleadoLoginAction } from "@/components/actions/auth.actions";
 
 export default function LoginPage() {
@@ -12,10 +13,24 @@ export default function LoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const session = getEmployeeSession();
-    if (session) {
-      router.replace("/inventario");
-    }
+    const current = getEmployeeSession();
+    if (!current) return;
+
+    let active = true;
+    validateEmpleadoLoginAction(current.numero_empleado)
+      .then(() => {
+        if (active) router.replace("/inventario");
+      })
+      .catch((err: unknown) => {
+        clearEmployeeSession();
+        if (active) {
+          setError(err instanceof Error ? err.message : "No se pudo validar la sesión.");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, [router]);
 
   async function handleLogin() {
@@ -48,13 +63,18 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#f8fafc,#eef2ff_60%,#e0f2fe)] px-4 py-8">
+    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#ecfdf5,#f8fafc_60%,#fffbeb)] px-4 py-8">
       <div className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white/90 p-6 shadow-[0_20px_70px_rgba(15,23,42,0.12)] backdrop-blur sm:p-8">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-600 text-2xl font-semibold text-white">
-            Y
-          </div>
-          <h1 className="text-2xl font-semibold text-slate-900">Ingreso al almacén</h1>
+          <Image
+            src="/logo-mlopez.png"
+            alt="Logotipo de M. López"
+            width={80}
+            height={80}
+            className="mx-auto mb-4 h-20 w-20 rounded-2xl object-contain"
+            priority
+          />
+          <h1 className="text-2xl font-semibold text-slate-900">Ingreso al Panel de control</h1>
           <p className="mt-2 text-sm text-slate-600">
             Escanea o escribe el código de la tarjeta del empleado para entrar.
           </p>
@@ -71,7 +91,7 @@ export default function LoginPage() {
                 if (event.key === "Enter") handleLogin();
               }}
               placeholder="Ej. EMP-001"
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
             />
           </label>
 
@@ -85,7 +105,7 @@ export default function LoginPage() {
             type="button"
             onClick={handleLogin}
             disabled={loading}
-            className="w-full rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-full bg-emerald-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? "Entrando..." : "Entrar al sistema"}
           </button>

@@ -68,7 +68,7 @@ export default function ReportesPage() {
       <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
         
         {/* Encabezado Principal */}
-        <section className="mb-6 rounded-2xl bg-slate-50 border border-slate-200 p-5 sm:p-6 shadow-sm">
+        <section className="mb-6 rounded-2xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-5 shadow-sm sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h1 className="text-xl sm:text-3xl font-bold text-slate-900 tracking-tight">Reportes de Almacén</h1>
@@ -80,15 +80,15 @@ export default function ReportesPage() {
               {/* 2. 🔥 BOTÓN DE CIERRE GENERAL: Abre la secuencia del modal con un aviso visual */}
               <button 
                 onClick={() => setIsModalOpen(true)}
-                className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 active:scale-98 shadow-xs flex items-center gap-2"
+                className="flex min-h-11 items-center gap-2 rounded-xl bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-emerald-900 active:scale-98"
               >
                 <span>🔒</span> Realizar Corte Diario
               </button>
               
-              <button className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 active:scale-98">
+              <button className="min-h-11 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-50 active:scale-98">
                 Exportar PDF
               </button>
-              <button className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 active:scale-98">
+              <button className="min-h-11 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-50 active:scale-98">
                 Exportar Excel
               </button>
             </div>
@@ -112,7 +112,7 @@ export default function ReportesPage() {
         </section>
 
         {/* Tabla Dinámica */}
-        <section className="rounded-2xl bg-white border border-slate-200 p-4 sm:p-6 shadow-xs">
+        <section className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-xs sm:p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
             <div>
               <h2 className="text-lg sm:text-xl font-bold text-slate-900">Historial Reciente</h2>
@@ -144,7 +144,7 @@ export default function ReportesPage() {
 
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="min-w-full divide-y divide-slate-200 text-left text-xs sm:text-sm">
-              <thead className="bg-slate-800 text-white select-none">
+              <thead className="bg-emerald-950 text-white select-none">
                 <tr>
                   <th className="px-4 py-3 font-medium tracking-wide">ID</th>
                   <th className="px-4 py-3 font-medium tracking-wide">Fecha</th>
@@ -169,7 +169,7 @@ export default function ReportesPage() {
                       <td className="px-4 py-3.5 text-slate-600 whitespace-nowrap">{reporte.fecha}</td>
                       <td className="px-4 py-3.5 whitespace-nowrap">
                         <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold ${
-                          reporte.tipo === "Tarimas" ? "bg-blue-50 text-blue-700 border border-blue-100" :
+                          reporte.tipo === "Tarimas" ? "bg-emerald-50 text-emerald-800 border border-emerald-100" :
                           reporte.tipo === "Peso" ? "bg-amber-50 text-amber-700 border border-amber-100" :
                           "bg-emerald-50 text-emerald-700 border border-emerald-100"
                         }`}>

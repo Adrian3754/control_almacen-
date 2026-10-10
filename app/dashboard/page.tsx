@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useEffect } from "react";
 import { getEmployeeSession } from "@/lib/employeeSession";
 import { EmployeeSession } from "@/lib/employeeSession";
@@ -104,56 +105,58 @@ export default function Home() {
   const isSupervisor = Number(session?.nivel_jerarquia) === 2;
 
   const quickLinks = [
-    { href: "/inventario", label: "Nuevo Inventario", icon: "📝", color: "blue", show: true },
-    { href: "/lotes", label: "Ver Lotes", icon: "📋", color: "purple", show: true },
-    { href: "/movimientos", label: "Registrar Movimiento", icon: "➕", color: "green", show: true },
-    { href: "/tarimas", label: "Gestionar Tarimas", icon: "🎯", color: "orange", show: true },
-    { href: "/repostes", label: "Reportes", icon: "📊", color: "red", show: isAdmin || isSupervisor },
-    { href: "/settings/usuarios", label: "Usuarios", icon: "👥", color: "indigo", show: isAdmin },
+    { href: "/inventario", label: "Nuevo Inventario", icon: "📝", color: "green", show: true },
+    { href: "/lotes", label: "Ver Lotes", icon: "📋", color: "green", show: true },
+    { href: "/movimientos", label: "Registrar Movimiento", icon: "➕", color: "gold", show: true },
+    { href: "/tarimas", label: "Gestionar Tarimas", icon: "🎯", color: "green", show: true },
+    { href: "/repostes", label: "Reportes", icon: "📊", color: "gold", show: isAdmin || isSupervisor },
+    { href: "/settings/usuarios", label: "Usuarios", icon: "👥", color: "green", show: isAdmin },
   ];
 
   const colorClasses: Record<string, string> = {
-    blue: "from-blue-500 to-blue-600 hover:shadow-blue-500/50",
-    purple: "from-purple-500 to-purple-600 hover:shadow-purple-500/50",
-    green: "from-green-500 to-green-600 hover:shadow-green-500/50",
-    orange: "from-orange-500 to-orange-600 hover:shadow-orange-500/50",
-    red: "from-red-500 to-red-600 hover:shadow-red-500/50",
-    indigo: "from-indigo-500 to-indigo-600 hover:shadow-indigo-500/50",
+    green: "from-emerald-700 to-green-800 hover:shadow-emerald-700/30",
+    gold: "from-amber-500 to-yellow-600 hover:shadow-amber-500/30",
   };
 
   return (
-    <main className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100">
+    <main className="min-h-screen bg-linear-to-br from-emerald-50/70 via-slate-50 to-amber-50/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
         
         {/* Bienvenida */}
         <div className="mb-6 sm:mb-8">
-          <div className="bg-white rounded-2xl shadow-lg p-5 sm:p-8 border border-slate-200">
+          <div className="bg-white rounded-2xl shadow-lg p-5 sm:p-8 border border-emerald-100">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight break-words">
                   Hola, {session?.nombre || session?.numero_empleado || "Usuario"} 👋
                 </h1>
                 <p className="text-slate-600 mt-1 sm:mt-2 text-base sm:text-lg">
-                  Bienvenido a Control de Almacén
+                  Bienvenido a M. López
                 </p>
               </div>
-              <div className="hidden md:block text-6xl opacity-20 select-none">📦</div>
+              <Image
+                src="/logo-mlopez.png"
+                alt="Logotipo de M. López"
+                width={88}
+                height={88}
+                className="hidden h-20 w-20 rounded-2xl object-contain opacity-90 md:block"
+              />
             </div>
 
             {/* Información de usuario responsiva (Adaptada a 3 columnas) */}
             {session && (
               <div className="mt-5 sm:mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                <div className="bg-emerald-50/60 rounded-xl p-3 border border-emerald-100">
                   <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">Rol</p>
                   <p className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5 truncate">{session.rol || "N/A"}</p>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                <div className="bg-emerald-50/60 rounded-xl p-3 border border-emerald-100">
                   <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">Número de Empleado</p>
                   <p className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5">{session.numero_empleado}</p>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                <div className="bg-amber-50/70 rounded-xl p-3 border border-amber-100">
                   <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">Estado</p>
-                  <p className="text-lg sm:text-xl font-bold text-green-600 flex items-center gap-2 mt-0.5">
+                  <p className="text-lg sm:text-xl font-bold text-emerald-700 flex items-center gap-2 mt-0.5">
                     {Icons.checkmark} Activo
                   </p>
                 </div>
@@ -165,19 +168,17 @@ export default function Home() {
         {/* KPIs Grid Adaptable (1 col en móvil, 2 en tablet, 4 en PC) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-10">
           {[
-            { icon: Icons.kilo, label: "Kilos Disponibles (Total)", value: loading ? "..." : `${stats.kilosDisponibles} Kg`, color: "blue" },
+            { icon: Icons.kilo, label: "Kilos Disponibles (Total)", value: loading ? "..." : `${stats.kilosDisponibles} Kg`, color: "green" },
             { icon: Icons.kilo, label: "Kilos en Cuarto Frío", value: loading ? "..." : `${stats.kilosCuartoFrio} Kg`, color: "green" },
-            { icon: Icons.downloading, label: "Lotes Por Descargar", value: loading ? "..." : stats.lotesPorDescargar, color: "orange" },
-            { icon: Icons.lote, label: "Lotes Descargados", value: loading ? "..." : stats.lotesDescargados, color: "purple" },
+            { icon: Icons.downloading, label: "Lotes Por Descargar", value: loading ? "..." : stats.lotesPorDescargar, color: "gold" },
+            { icon: Icons.lote, label: "Lotes Descargados", value: loading ? "..." : stats.lotesDescargados, color: "green" },
           ].map((stat, idx) => (
-            <div key={idx} className="bg-white rounded-2xl shadow-sm p-5 sm:p-6 border border-slate-200 hover:shadow-md transition-all duration-200">
+            <div key={idx} className="bg-white rounded-2xl shadow-sm p-5 sm:p-6 border border-emerald-100 hover:shadow-md transition-all duration-200">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-slate-500 text-xs sm:text-sm font-medium truncate">{stat.label}</p>
                   <p className={`text-2xl sm:text-3xl lg:text-4xl font-bold mt-1 tracking-tight truncate ${
-                    stat.color === "green" ? "text-green-600" : 
-                    stat.color === "blue" ? "text-blue-600" : 
-                    stat.color === "purple" ? "text-purple-600" : "text-orange-600"
+                    stat.color === "gold" ? "text-amber-600" : "text-emerald-700"
                   }`}>
                     {stat.value}
                   </p>
@@ -212,8 +213,20 @@ export default function Home() {
         </div>
 
         {/* Información del sistema (Colapsa a 1 columna en móvil de manera limpia) */}
-        <div className="bg-white rounded-2xl shadow-sm p-5 sm:p-6 border border-slate-200">
-          <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4">Información del Sistema</h2>
+        <div className="bg-white rounded-2xl shadow-sm p-5 sm:p-6 border border-emerald-100">
+          <div className="mb-4 flex items-center gap-3">
+            <Image
+              src="/logo-mlopez.png"
+              alt="Logotipo de M. López"
+              width={48}
+              height={48}
+              className="h-12 w-12 rounded-xl object-contain"
+            />
+            <div>
+              <h2 className="text-lg font-bold text-emerald-900 sm:text-xl">Información del Sistema</h2>
+              <p className="text-xs font-medium text-amber-700">M. López · Gestión de almacén</p>
+            </div>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 text-xs sm:text-sm">
             <div className="border-b sm:border-b-0 sm:border-r border-slate-100 pb-3 sm:pb-0 sm:pr-4">
               <p className="text-slate-400 font-medium mb-1">Última Sesión</p>

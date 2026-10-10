@@ -8,6 +8,7 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1", "localhost", "192.168.1.113"],
   /* ... tus otras configuraciones si tienes (ej. imágenes, etc.) ... */
   
   typescript: {

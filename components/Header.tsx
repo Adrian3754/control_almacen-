@@ -67,7 +67,7 @@ export default function Header() {
           <div className="flex-1 min-w-0">
             <Link href="/" className="block">
               <h1 className="text-lg sm:text-2xl font-bold bg-linear-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                📦 Control de Almacén
+                ML · M. López
               </h1>
               <p className="text-xs text-slate-500 mt-1 hidden sm:block">Sistema de gestión integral</p>
             </Link>
@@ -132,7 +132,7 @@ export default function Header() {
 
           {/* Login link when no session */}
           {!session && (
-            <Link href="/login" className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-700">
+            <Link href="/login" className="rounded-lg bg-emerald-800 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-900">
               Ingresar
             </Link>
           )}
@@ -192,7 +192,7 @@ export default function Header() {
 
           {/* Mobile login button when no session */}
           {!session && (
-            <Link href="/login" className="md:hidden inline-flex h-10 min-w-[8rem] items-center justify-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700">
+            <Link href="/login" className="md:hidden inline-flex h-10 min-w-[8rem] items-center justify-center rounded-md bg-emerald-800 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-900">
               Ingresar
             </Link>
           )}
@@ -231,7 +231,7 @@ export default function Header() {
                   <button type="button" onClick={() => { setOpen(false); handleLogout(); }} className="px-4 py-3 rounded-lg text-left text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors duration-150">Cerrar sesión</button>
                 </>
               ) : (
-                <Link href="/login" onClick={() => setOpen(false)} className="px-4 py-3 rounded-lg text-sm font-medium text-sky-700 hover:bg-sky-50 transition-colors duration-150">Ingresar</Link>
+                <Link href="/login" onClick={() => setOpen(false)} className="px-4 py-3 rounded-lg text-sm font-medium text-emerald-800 hover:bg-emerald-50 transition-colors duration-150">Ingresar</Link>
               )}
             </nav>
           </aside>

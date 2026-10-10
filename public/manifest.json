@@ -1,22 +1,18 @@
 {
-  "name": "Control de Almacen",
-  "short_name": "AlmacenApp",
+  "name": "M. López",
+  "short_name": "ML",
   "description": "Sistema de gestión e inventario de tarimas y calidad",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#0f172a",
+  "theme_color": "#1f4d2b",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "public/icons/192x192 pixeles.jpg",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "public/icons/512x512.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "src": "/logo-mlopez.png",
+      "sizes": "2000x2000",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }   

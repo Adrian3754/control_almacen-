@@ -49,6 +49,14 @@ function getErrorMessage(error: unknown) {
   return String(error);
 }
 
+function requiredField(value: string, label: string, maxLength: number) {
+  const normalized = value.trim();
+  if (!normalized || normalized.length > maxLength) {
+    throw new Error(`${label} es obligatorio y debe tener máximo ${maxLength} caracteres.`);
+  }
+  return normalized;
+}
+
 /**
  * Obtener la lista completa de perfiles ordenados por jerarquía
  */
@@ -57,15 +65,15 @@ export async function getUsuariosAction(): Promise<Perfil[]> {
   
   const { data, error } = await supabase
     .from("perfiles")
-    .select("*")
+    .select("id, nombre, telefono, numero_empleado, cargo, nivel_jerarquia, rol")
     .order("nivel_jerarquia", { ascending: true });
 
   if (error) {
     console.error("❌ Error en getUsuariosAction:", error.message);
-    throw new Error("No se pudo conectar con la base de datos de perfiles. Verifica la configuración.");
+    throw new Error(`No se pudieron cargar los perfiles desde Supabase: ${error.message}`);
   }
 
-  return data as Perfil[];
+  return (data ?? []) as Perfil[];
 }
 
 export async function getDespulpadoresAction(): Promise<Despulpador[]> {
@@ -81,8 +89,8 @@ export async function getDespulpadoresAction(): Promise<Despulpador[]> {
     throw new Error("No se pudo conectar con la base de datos de despulpadores.");
   }
 
-  return (data ?? []).map((item: any) => ({
-    id: String(item.id_despulpador ?? item.id ?? ""),
+  return (data ?? []).map((item) => ({
+    id: String(item.id_despulpador ?? ""),
     id_despulpador: item.id_despulpador ? String(item.id_despulpador) : null,
     nombre_completo: item.nombre_completo ?? "Sin nombre",
   }));
@@ -199,21 +207,42 @@ export async function crearUsuarioDirectoAction(datos: {
   nivel_jerarquia: number;
   rol: Perfil["rol"];
 }) {
+  const nombre = requiredField(datos.nombre, "El nombre completo", 150);
+  const numeroEmpleado = requiredField(datos.numero_empleado, "El número de empleado", 50);
+  const email = requiredField(datos.email, "El correo de acceso", 254).toLowerCase();
+  const cargo = requiredField(datos.cargo, "El área o puesto", 100);
+  const telefono = (datos.telefono ?? "").trim();
+  const nivelJerarquia = Number(datos.nivel_jerarquia);
+  const rolesValidos: Perfil["rol"][] = ["Administrador", "Encargado", "Operador"];
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("Escribe un correo electrónico válido.");
+  }
+  if (telefono.length > 40) {
+    throw new Error("El teléfono no puede exceder 40 caracteres.");
+  }
+  if (!Number.isInteger(nivelJerarquia) || nivelJerarquia < 1 || nivelJerarquia > 3) {
+    throw new Error("Selecciona una jerarquía válida.");
+  }
+  if (!rolesValidos.includes(datos.rol)) {
+    throw new Error("Selecciona un rol válido.");
+  }
+
   const supabase = createServerSupabaseClient();
   const authSupabase = createAuthAdminSupabaseClient();
 
   const password = "PasswordTemporal2026*";
 
   const { data: authData, error: authError } = await authSupabase.auth.admin.createUser({
-    email: datos.email.trim().toLowerCase(),
+    email,
     password,
     email_confirm: true,
     user_metadata: {
-      nombre: datos.nombre?.trim() ?? null,
-      numero_empleado: datos.numero_empleado?.trim() ?? null,
-      cargo: datos.cargo?.trim() ?? null,
-      telefono: datos.telefono?.trim() ?? null,
-      nivel_jerarquia: Number(datos.nivel_jerarquia),
+      nombre,
+      numero_empleado: numeroEmpleado,
+      cargo,
+      telefono: telefono || null,
+      nivel_jerarquia: nivelJerarquia,
       rol: datos.rol,
     },
   });
@@ -230,22 +259,24 @@ export async function crearUsuarioDirectoAction(datos: {
 
   const { error: perfilError } = await supabase.from("perfiles").insert([{
     id: authData.user.id,
-    nombre: datos.nombre?.trim() ?? null,
-    numero_empleado: datos.numero_empleado?.trim() ?? null,
-    cargo: datos.cargo?.trim() ?? null,
-    telefono: datos.telefono?.trim() ?? null,
-    nivel_jerarquia: Number(datos.nivel_jerarquia),
+    nombre,
+    numero_empleado: numeroEmpleado,
+    cargo,
+    telefono,
+    nivel_jerarquia: nivelJerarquia,
     rol: datos.rol,
   }]);
 
   if (perfilError) {
     console.error("❌ Error al insertar datos en la tabla perfiles:", perfilError.message);
-    // eliminar usuario creado en auth para evitar inconsistencias
-    await authSupabase.auth.admin.deleteUser(authData.user.id);
+    const { error: cleanupError } = await authSupabase.auth.admin.deleteUser(authData.user.id);
+    if (cleanupError) {
+      console.error("❌ No se pudo eliminar la cuenta de Auth después del error de perfil:", cleanupError.message);
+    }
     throw new Error(`Se canceló el alta: fallo al insertar en perfiles: ${perfilError.message}`);
   }
 
-  console.log(`✅ Usuario creado directamente: ${datos.email} (${datos.rol})`);
+  console.log(`✅ Usuario creado directamente: ${email} (${datos.rol})`);
   revalidatePath("/settings/usuarios");
 }
 
@@ -254,13 +285,21 @@ export async function crearUsuarioDirectoAction(datos: {
  */
 export async function actualizarJerarquiaAction(
   id: string, 
-  datos: { rol: Perfil["rol"]; cargo: string; telefono: string; nivel_jerarquia: number }
+  datos: {
+    nombre: string;
+    rol: Perfil["rol"];
+    cargo: string;
+    telefono: string;
+    nivel_jerarquia: number;
+  }
 ) {
+  const nombre = requiredField(datos.nombre, "El nombre completo", 150);
   const supabase = createServerSupabaseClient();
 
   const { error } = await supabase
     .from("perfiles")
     .update({
+      nombre,
       rol: datos.rol,
       cargo: datos.cargo.trim(),
       telefono: datos.telefono.trim(),
@@ -270,7 +309,7 @@ export async function actualizarJerarquiaAction(
 
   if (error) {
     console.error("❌ Error al actualizar jerarquía en cascada:", error.message);
-    throw new Error("Hubo un fallo al sincronizar la actualización con el servidor.");
+    throw new Error(`No se pudieron guardar los cambios del perfil: ${error.message}`);
   }
 
   revalidatePath("/settings/usuarios");

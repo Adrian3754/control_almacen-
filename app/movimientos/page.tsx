@@ -215,12 +215,12 @@ export default function MovimientosPage() {
     }
   }
 
-  const inputStyle = "w-full rounded-2xl border border-slate-300 bg-slate-200 px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:border-sky-500 focus:bg-slate-100 transition shadow-inner";
+  const inputStyle = "w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-600/10 transition";
 
   return (
     <main className="min-h-screen bg-transparent">
-      <div className="mx-auto max-w-7xl p-6 sm:p-8">
-        <section className="mb-8 rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
+      <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+        <section className="mb-6 rounded-3xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-5 shadow-sm sm:mb-8 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h1 className="text-3xl font-semibold text-slate-900">Movimientos de yaca</h1>
@@ -231,7 +231,7 @@ export default function MovimientosPage() {
             <button
               type="button"
               onClick={abrirModalNuevo}
-              className="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
+              className="min-h-11 rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-900"
             >
               Registrar movimiento
             </button>
@@ -242,7 +242,7 @@ export default function MovimientosPage() {
         <section className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Kilos en Cuarto Frío</p>
-            <p className="mt-2 text-2xl font-bold text-sky-700">
+            <p className="mt-2 text-2xl font-bold text-emerald-800">
               {loading ? "..." : `${stats.enFrio} Kg`}
             </p>
           </div>
@@ -258,9 +258,9 @@ export default function MovimientosPage() {
               {loading ? "..." : `${stats.kilosBuenos} kg`}
             </p>
           </div>
-          <div className="rounded-3xl border border-indigo-200 bg-indigo-50/40 p-4 shadow-sm">
-            <p className="text-xs font-medium text-indigo-800 uppercase tracking-wider">Devueltos (Falta Madurar)</p>
-            <p className="mt-2 text-2xl font-bold text-indigo-600">
+          <div className="rounded-3xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm">
+            <p className="text-xs font-medium text-amber-800 uppercase tracking-wider">Devueltos (Falta Madurar)</p>
+            <p className="mt-2 text-2xl font-bold text-amber-700">
               {loading ? "..." : `${stats.kilosDevueltosVerdes} kg`}
             </p>
           </div>
@@ -273,14 +273,14 @@ export default function MovimientosPage() {
         </section>
 
         {/* Tabla */}
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm sm:p-6">
           <h2 className="text-xl font-semibold text-slate-900 mb-4">Últimos movimientos</h2>
           <div className="overflow-x-auto">
             {loading ? (
               <div className="text-center py-8 text-sm text-slate-500">Cargando...</div>
             ) : (
               <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-                <thead className="bg-slate-50">
+                <thead className="bg-emerald-50/70">
                   <tr>
                     <th className="px-4 py-3 font-medium text-slate-600">Tarima</th>
                     <th className="px-4 py-3 font-medium text-slate-600">Tipo</th>
@@ -408,14 +408,14 @@ export default function MovimientosPage() {
                     value={observacion}
                     onChange={(event) => setObservacion(event.target.value)}
                     placeholder="O detalla un motivo manual..."
-                    className="min-h-20 w-full rounded-2xl border border-slate-300 bg-slate-200 px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:border-sky-500 focus:bg-slate-100 transition shadow-inner"
+                    className="min-h-20 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-600/10 transition"
                   />
                 </label>
               </div>
 
               <div className="mt-6 flex justify-end gap-3">
                 <button type="button" onClick={() => { setModalOpen(false); resetForm(); }} className="rounded-full border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">Cancelar</button>
-                <button type="button" onClick={registrarMovimiento} className="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700">Guardar</button>
+                <button type="button" onClick={registrarMovimiento} className="rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-900">Guardar</button>
               </div>
             </div>
           </div>

@@ -174,7 +174,7 @@ export default function TarimasPage() {
 
   return (
     <main className="min-h-screen bg-transparent">
-      <div className="max-w-7xl mx-auto p-6 sm:p-8 space-y-6">
+      <div className="mx-auto max-w-7xl space-y-5 p-4 sm:space-y-6 sm:p-6 lg:p-8">
         
         {/* Notificaciones de Sistema */}
         {message && (
@@ -188,10 +188,10 @@ export default function TarimasPage() {
           </div>
         )}
 
-        <section className="rounded-3xl bg-slate-50 border border-slate-200 p-6 shadow-sm">
+        <section className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-5 shadow-sm sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-3xl font-semibold text-slate-900">Control de Tarimas — Yaca</h1>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Control de Tarimas — Yaca</h1>
               <p className="mt-2 text-slate-600 text-sm">
                 Gestión automatizada de embalaje de Yaca. El servidor calcula la secuencia consecutiva de etiquetas y descuenta del lote.
               </p>
@@ -199,7 +199,7 @@ export default function TarimasPage() {
           </div>
 
           <div className="mt-6 flex flex-col gap-4">
-            <div className="rounded-3xl bg-white border border-slate-200 p-5 shadow-sm flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Embalar nueva tarima</h2>
                 <p className="text-sm text-slate-500">Asigna peso, volumen e identifica el lote de la fruta recolectada.</p>
@@ -207,7 +207,7 @@ export default function TarimasPage() {
               <button
                 type="button"
                 onClick={() => setModalOpen(true)}
-                className="inline-flex items-center justify-center rounded-full bg-sky-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-800 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-900"
               >
                 + Generar Entrada de Tarima
               </button>
@@ -216,7 +216,7 @@ export default function TarimasPage() {
             {/* Impresión / Vista Previa */}
             {generatedTarima && (
               <div className="rounded-3xl bg-white border border-slate-200 p-5 shadow-sm space-y-4">
-                <h2 className="text-lg font-semibold text-purple-950">Última Etiqueta Generada</h2>
+                <h2 className="text-lg font-semibold text-emerald-950">Última Etiqueta Generada</h2>
                 <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700 grid grid-cols-2 md:grid-cols-4 gap-4">
                   <p><span className="font-semibold text-slate-900">Código Asignado:</span> {generatedTarima.barcode}</p>
                   <p><span className="font-semibold text-slate-900">Producto:</span> {generatedTarima.product}</p>
@@ -274,7 +274,7 @@ export default function TarimasPage() {
                     required
                     value={loteId}
                     onChange={(e) => setLoteId(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-sky-500"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10"
                   >
                     <option value="">-- Seleccionar Camión Activo --</option>
                     {lotes.length === 0 ? (
@@ -295,7 +295,7 @@ export default function TarimasPage() {
                   <input
                     type="number" min={1} value={quantity}
                     onChange={(e) => setQuantity(Number(e.target.value))}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-sky-500"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10"
                   />
                 </label>
 
@@ -304,7 +304,7 @@ export default function TarimasPage() {
                   <input
                     type="number" min={1} value={weight}
                     onChange={(e) => setWeight(Number(e.target.value))}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-sky-500"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10"
                   />
                 </label>
 
@@ -313,7 +313,7 @@ export default function TarimasPage() {
                   <textarea
                     placeholder="Escribe comentarios sobre las condiciones de la fruta si es necesario..." value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="min-h-16 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-sky-500"
+                    className="min-h-16 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10"
                   />
                 </label>
               </div>
@@ -329,7 +329,7 @@ export default function TarimasPage() {
                 <button
                   type="button"
                   onClick={generarTarima}
-                  className="rounded-full bg-sky-600 px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
+                  className="min-h-11 rounded-xl bg-emerald-800 px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-900"
                 >
                   Validar y Registrar Tarima
                 </button>

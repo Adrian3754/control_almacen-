@@ -30,8 +30,8 @@ export const createServerSupabaseClient = () => {
   });
 };
 
-// Cliente exclusivo para Supabase Auth Admin.
-// Auth Admin necesita la service_role legacy en formato JWT, no una llave sb_secret_*.
+// Cliente exclusivo para Supabase Auth Admin. Acepta la clave secreta nueva
+// de Supabase o la service_role legacy en formato JWT.
 export const createAuthAdminSupabaseClient = () => {
   const authAdminKey =
     process.env.SUPABASE_AUTH_ADMIN_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -42,9 +42,12 @@ export const createAuthAdminSupabaseClient = () => {
     );
   }
 
-  if (authAdminKey.startsWith("sb_secret_") || authAdminKey.split(".").length !== 3) {
+  const isSecretKey = authAdminKey.startsWith("sb_secret_");
+  const isLegacyJwt = authAdminKey.split(".").length === 3;
+
+  if (!isSecretKey && !isLegacyJwt) {
     throw new Error(
-      "Supabase Auth Admin requiere una service_role key legacy en formato JWT. Agrega SUPABASE_AUTH_ADMIN_KEY con la llave service_role legacy del proyecto."
+      "Supabase Auth Admin requiere una clave secreta sb_secret_ o una service_role legacy en formato JWT. Revisa SUPABASE_AUTH_ADMIN_KEY o SUPABASE_SERVICE_ROLE_KEY."
     );
   }
 

@@ -51,7 +51,7 @@ export default function InventarioForm({ onCreated, onCancel }: Props) {
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
             placeholder="Ej. Cemento"
           />
         </label>
@@ -60,7 +60,7 @@ export default function InventarioForm({ onCreated, onCancel }: Props) {
           <input
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
             placeholder="Ej. Materiales"
           />
         </label>
@@ -71,7 +71,7 @@ export default function InventarioForm({ onCreated, onCancel }: Props) {
             min={0}
             value={stock}
             onChange={(e) => setStock(Number(e.target.value))}
-            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
           />
         </label>
         <label className="space-y-2">
@@ -81,7 +81,7 @@ export default function InventarioForm({ onCreated, onCancel }: Props) {
             min={0}
             value={minimum}
             onChange={(e) => setMinimum(Number(e.target.value))}
-            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
           />
         </label>
         <label className="sm:col-span-2 space-y-2">
@@ -89,7 +89,7 @@ export default function InventarioForm({ onCreated, onCancel }: Props) {
           <input
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
             placeholder="Ej. Pasillo A - Rack 2"
           />
         </label>
@@ -107,7 +107,7 @@ export default function InventarioForm({ onCreated, onCancel }: Props) {
           type="button"
           onClick={handleSubmit}
           disabled={loading}
-          className="inline-flex items-center justify-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700 disabled:opacity-50"
+          className="inline-flex items-center justify-center rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-900 disabled:opacity-50"
         >
           {loading ? "Guardando..." : "Guardar producto"}
         </button>

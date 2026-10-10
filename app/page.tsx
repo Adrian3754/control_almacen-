@@ -1,28 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { getEmployeeSession } from "@/lib/employeeSession";
 
 export default function HomePage() {
-  const router = useRouter();
-  const [checking, setChecking] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    // Verificamos si el colaborador ya inició sesión
     const session = getEmployeeSession();
     if (session) {
-      router.replace("/dashboard");
-    } else {
-      setChecking(false);
+      window.location.replace("/dashboard");
     }
-  }, [router]);
-
-  if (checking) {
-    return null;
-  }
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between selection:bg-amber-200 selection:text-amber-900">
@@ -35,9 +26,14 @@ export default function HomePage() {
           
           {/* Brand / Logo M. López */}
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 to-green-700 text-white font-black text-xl shadow-md shadow-emerald-600/20">
-              ML
-            </div>
+            <Image
+              src="/logo-mlopez.png"
+              alt="Logotipo de M. López"
+              width={48}
+              height={48}
+              priority
+              className="h-12 w-12 rounded-2xl object-contain shadow-sm"
+            />
             <div>
               <span className="text-xl font-bold tracking-tight text-slate-900 block leading-none">
                 M. LÓPEZ
@@ -185,7 +181,17 @@ export default function HomePage() {
         {/* SOBRE LA EMPRESA */}
         <section id="empresa" className="py-20 max-w-7xl mx-auto px-4 sm:px-6">
           <div className="bg-gradient-to-br from-emerald-900 to-green-950 text-white rounded-3xl p-8 sm:p-12 shadow-xl relative overflow-hidden">
-            <div className="max-w-3xl relative z-10">
+            <div className="relative z-10 grid items-center gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
+              <div className="mx-auto flex h-48 w-48 items-center justify-center rounded-3xl bg-white p-3 shadow-xl md:h-56 md:w-56">
+                <Image
+                  src="/logo-mlopez.png"
+                  alt="Logotipo de M. López"
+                  width={512}
+                  height={512}
+                  className="h-full w-full object-contain"
+                />
+              </div>
+              <div className="max-w-3xl">
               <span className="text-amber-400 text-xs font-bold uppercase tracking-wider bg-amber-400/10 px-3 py-1 rounded-md border border-amber-400/20">
                 Empresa Agroexportadora
               </span>
@@ -197,6 +203,7 @@ export default function HomePage() {
                 <span className="bg-white/10 px-3 py-1.5 rounded-full">✓ Exportación a EE. UU.</span>
                 <span className="bg-white/10 px-3 py-1.5 rounded-full">✓ Calidad Internacional</span>
                 <span className="bg-white/10 px-3 py-1.5 rounded-full">✓ Desarrollo Sostenible</span>
+              </div>
               </div>
             </div>
           </div>

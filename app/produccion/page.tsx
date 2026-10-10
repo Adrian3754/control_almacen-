@@ -296,19 +296,19 @@ export default function ProduccionPage() {
 
   return (
     // Se añade min-h-screen y bg-slate-50 para cubrir toda la página
-    <div className="min-h-screen w-full bg-slate-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
+    <div className="min-h-screen w-full bg-transparent p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">Panel de Producción</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Panel de Producción</h1>
             <p className="text-slate-500">Gestión de pesajes y lotes.</p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-3">
             <button
               onClick={manejarCorteTurno}
               disabled={registros.length === 0 || loading}
-              className="bg-white border border-slate-300 text-slate-700 px-4 py-2.5 rounded-lg font-medium hover:bg-slate-50 disabled:opacity-50"
+              className="min-h-11 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 font-medium text-emerald-900 hover:bg-emerald-50 disabled:opacity-50"
             >
               Hacer Corte
             </button>

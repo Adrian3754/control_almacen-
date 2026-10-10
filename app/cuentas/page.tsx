@@ -244,8 +244,8 @@ export default function CuentasPage() {
 
   return (
     <main className="min-h-screen bg-transparent">
-      <div className="max-w-7xl mx-auto p-6 sm:p-8">
-        <section className="mb-8 rounded-3xl bg-slate-50 border border-slate-200 p-6 shadow-sm">
+      <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+        <section className="mb-6 rounded-3xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-5 shadow-sm sm:mb-8 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
               <h1 className="text-3xl font-semibold text-slate-900">Cuentas Bancarias</h1>
@@ -256,7 +256,7 @@ export default function CuentasPage() {
               <button
                 type="button"
                 onClick={openCreateModal}
-                className="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 shadow-sm active:scale-95"
+                className="min-h-11 rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-900 shadow-sm active:scale-95"
               >
                 Nueva cuenta
               </button>
@@ -295,7 +295,7 @@ export default function CuentasPage() {
                 setCurrentPage(1);
               }}
               placeholder="Buscar en la tabla..."
-              className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:bg-white"
+              className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:bg-white"
             />
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900">
               {loading ? "..." : `${filteredCuentas.length} cuentas`}
@@ -312,7 +312,7 @@ export default function CuentasPage() {
                     setFilterBank(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:bg-white"
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:bg-white"
                 >
                   {bankFilterOptions.map((option) => (
                     <option key={option} value={option}>{option}</option>
@@ -327,7 +327,7 @@ export default function CuentasPage() {
                     setFilterEstado(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:bg-white"
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:bg-white"
                 >
                   {estadoOptions.map((option) => (
                     <option key={option} value={option}>{option}</option>
@@ -454,7 +454,7 @@ export default function CuentasPage() {
                             setSelectedCuenta(null);
                             openEditModal(selectedCuenta);
                           }}
-                          className="w-full sm:flex-1 rounded-2xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
+                          className="w-full sm:flex-1 rounded-2xl bg-emerald-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-900"
                         >
                           Editar cuenta
                         </button>
@@ -478,7 +478,7 @@ export default function CuentasPage() {
           </div>
         )}
 
-        <section className="rounded-3xl bg-white border border-slate-200 p-6 shadow-sm">
+        <section className="rounded-3xl bg-white border border-emerald-100 p-4 shadow-sm sm:p-6">
           <div className="space-y-4">
             {loading ? (
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-500">Cargando cuentas...</div>
@@ -658,7 +658,7 @@ export default function CuentasPage() {
                     type="text"
                     value={form.proveedor}
                     onChange={(e) => updateField("proveedor", e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:bg-white"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:bg-white"
                   />
                 </label>
 
@@ -668,7 +668,7 @@ export default function CuentasPage() {
                     type="text"
                     value={form.giro}
                     onChange={(e) => updateField("giro", e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:bg-white"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:bg-white"
                   />
                 </label>
 
@@ -678,7 +678,7 @@ export default function CuentasPage() {
                     type="text"
                     value={form.direccion}
                     onChange={(e) => updateField("direccion", e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:bg-white"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:bg-white"
                   />
                 </label>
 
@@ -688,7 +688,7 @@ export default function CuentasPage() {
                     type="tel"
                     value={form.telefono}
                     onChange={(e) => updateField("telefono", e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:bg-white"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:bg-white"
                   />
                 </label>
 
@@ -697,7 +697,7 @@ export default function CuentasPage() {
                   <select
                     value={form.banco}
                     onChange={(e) => updateField("banco", e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:bg-white"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:bg-white"
                   >
                     {bankOptions.map((option) => (
                       <option key={option} value={option}>{option}</option>
@@ -711,7 +711,7 @@ export default function CuentasPage() {
                     type="text"
                     value={form.referencia}
                     onChange={(e) => updateField("referencia", e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:bg-white"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:bg-white"
                   />
                 </label>
 
@@ -721,7 +721,7 @@ export default function CuentasPage() {
                     type="text"
                     value={form.cuenta_cie}
                     onChange={(e) => updateField("cuenta_cie", e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:bg-white"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:bg-white"
                   />
                 </label>
 
@@ -731,7 +731,7 @@ export default function CuentasPage() {
                     type="text"
                     value={form.clave_bancaria}
                     onChange={(e) => updateField("clave_bancaria", e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:bg-white"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:bg-white"
                   />
                 </label>
 
@@ -741,7 +741,7 @@ export default function CuentasPage() {
                     type="text"
                     value={form.beneficiario}
                     onChange={(e) => updateField("beneficiario", e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:bg-white"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 focus:bg-white"
                   />
                 </label>
 
@@ -762,7 +762,7 @@ export default function CuentasPage() {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="inline-flex items-center justify-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+                    className="inline-flex items-center justify-center rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
                   >
                     {saving ? "Guardando..." : modalMode === "edit" ? "Guardar cambios" : "Guardar cuenta"}
                   </button>

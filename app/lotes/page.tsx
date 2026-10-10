@@ -75,10 +75,10 @@ export default function LotesPage() {
 
   return (
     <main className="min-h-screen bg-transparent">
-      <div className="max-w-7xl mx-auto p-6 sm:p-8">
+      <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
         
         {/* Sección del Panel de Control Superior (Header) */}
-        <section className="mb-8 rounded-3xl bg-slate-50 border border-slate-200 p-6 shadow-sm">
+        <section className="mb-6 rounded-3xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-5 shadow-sm sm:mb-8 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h1 className="text-3xl font-semibold text-slate-900">Lotes por camión</h1>
@@ -93,7 +93,7 @@ export default function LotesPage() {
               <button
                 type="button"
                 onClick={() => setModalOpen(true)}
-                className="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 shadow-sm active:scale-95"
+                className="min-h-11 rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-900 shadow-sm active:scale-95"
               >
                 Crear nuevo lote
               </button>
@@ -102,17 +102,14 @@ export default function LotesPage() {
         </section>
 
         {/* Tabla Principal de Visualización */}
-        <section className="rounded-3xl bg-white border border-slate-200 p-6 shadow-sm">
+        <section className="rounded-3xl bg-white border border-emerald-100 p-4 shadow-sm sm:p-6">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-              <thead className="bg-slate-50">
+              <thead className="bg-emerald-50/70">
                 <tr>
                   <th className="px-4 py-3 font-medium text-slate-600">Camión / Lote</th>
                   <th className="px-4 py-3 font-medium text-slate-600">Fecha</th>
-                  <th className="px-4 py-3 font-medium text-slate-600">Producto</th>
                   <th className="px-4 py-3 font-medium text-slate-600">Kilos Actuales</th>
-                  <th className="px-4 py-3 font-medium text-slate-600">Estado</th>
-                  <th className="px-4 py-3 font-medium text-slate-600 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white">
@@ -129,29 +126,9 @@ export default function LotesPage() {
                     <tr key={`${lote.camion}-${idx}`} className="hover:bg-slate-50/70 transition">
                       <td className="px-4 py-4 font-semibold text-slate-800">{lote.camion}</td>
                       <td className="px-4 py-4 text-slate-600">{lote.fecha}</td>
-                      <td className="px-4 py-4 text-slate-600">{lote.producto}</td>
+                     
                       <td className="px-4 py-4 font-mono font-bold text-slate-900">{lote.kilos} kg</td>
-                      <td className="px-4 py-4">
-                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                          lote.estado === "Descargado" 
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
-                            : "bg-amber-50 text-amber-700 border border-amber-200"
-                        }`}>
-                          {lote.estado}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedLote(lote);
-                            setMovimientosModalOpen(true);
-                          }}
-                          className="rounded-full bg-slate-100 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 border border-slate-200 transition active:scale-95"
-                        >
-                          📋 Ver Movimientos
-                        </button>
-                      </td>
+                   
                     </tr>
                   ))
                 )}
@@ -195,7 +172,7 @@ export default function LotesPage() {
                     value={camionInput} 
                     onChange={(e) => setCamionInput(e.target.value)} 
                     placeholder="Ej. Lote-45 o Camión Juan" 
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3.5 text-base font-semibold text-slate-900 placeholder-slate-400 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3.5 text-base font-semibold text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-600/10"
                   />
                 </div>
 
@@ -212,7 +189,7 @@ export default function LotesPage() {
                       value={kilosInput} 
                       onChange={(e) => setKilosInput(e.target.value === "" ? "" : Number(e.target.value))} 
                       placeholder="Ej. 45000" 
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 pl-12 pr-4 py-3.5 text-base font-semibold text-slate-900 placeholder-slate-400 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10"
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 pl-12 pr-4 py-3.5 text-base font-semibold text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-600/10"
                     />
                   </div>
                 </div>
@@ -230,7 +207,7 @@ export default function LotesPage() {
                 <button 
                   type="button" 
                   onClick={crearLote} 
-                  className="inline-flex items-center justify-center rounded-full bg-sky-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700 active:scale-95"
+                  className="inline-flex items-center justify-center rounded-xl bg-emerald-800 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-900 active:scale-95"
                 >
                   Confirmar e Ingresar
                 </button>

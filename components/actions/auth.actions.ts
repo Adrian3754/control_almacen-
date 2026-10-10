@@ -3,6 +3,10 @@
 import { createPublicSupabaseClient, createServerSupabaseClient } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
 import type { Perfil } from "@/components/actions/usuarios.actions";
+import {
+  clearServerEmployeeSession,
+  setServerEmployeeSession,
+} from "@/lib/serverEmployeeSession";
 
 export async function signInWithEmailAction(email: string, password: string) {
   const supabase = createPublicSupabaseClient();
@@ -47,10 +51,12 @@ export async function validateEmpleadoLoginAction(numeroEmpleado: string): Promi
     throw new Error("Código de empleado no encontrado. Verifica la información e inténtalo de nuevo.");
   }
 
+  await setServerEmployeeSession(data.numero_empleado);
   return data as Perfil;
 }
 
 export async function signOutAction() {
+  await clearServerEmployeeSession();
   const supabase = createServerSupabaseClient();
   const { error } = await supabase.auth.signOut();
 
@@ -59,6 +65,10 @@ export async function signOutAction() {
   }
 
   revalidatePath("/", "layout");
+}
+
+export async function clearEmployeeSessionAction() {
+  await clearServerEmployeeSession();
 }
 
 export async function getCurrentProfileAction() {
