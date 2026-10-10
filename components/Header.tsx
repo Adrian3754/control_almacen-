@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { EmployeeSession, getEmployeeSession, clearEmployeeSession } from "@/lib/employeeSession";
+import DatabaseConnectionStatus from "@/components/DatabaseConnectionStatus";
 
 // Niveles jerárquicos:
 // 1 = Administrador (acceso a todo)
@@ -71,6 +72,7 @@ export default function Header() {
               </h1>
               <p className="text-xs text-slate-500 mt-1 hidden sm:block">Sistema de gestión integral</p>
             </Link>
+            <DatabaseConnectionStatus />
           </div>
 
           {/* Desktop nav: visible only when session exists; items filtered by level */}
