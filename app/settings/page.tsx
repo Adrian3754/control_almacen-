@@ -15,7 +15,8 @@ interface Usuario {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [session, setSession] = useState(() => getEmployeeSession());
+  // Inicializamos en null para evitar advertencias de hidratación en Next.js
+  const [session, setSession] = useState<any>(null);
 
   // 1. Estado para simular nuestra base de datos de usuarios
   const [usuarios, setUsuarios] = useState<Usuario[]>([
@@ -52,9 +53,8 @@ export default function SettingsPage() {
         return user;
       })
     );
-    
-    // NOTA: Aquí es donde harías tu fetch/axios a la base de datos:
-    // await supabase.from('empleados').update({ nivel_jerarquia: nuevoNivel }).eq('id', id)
+
+    // NOTA: Aquí realizarías la llamada a la base de datos (Supabase / API)
   };
 
   if (!session) {
@@ -63,9 +63,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
-        {/* =========================================================================
-          CONTENIDO PRINCIPAL DE LA PÁGINA
-          ========================================================================= */}
+      {/* CONTENIDO PRINCIPAL DE LA PÁGINA */}
       <main className="flex-1 p-6 sm:p-8">
         <div className="mx-auto max-w-5xl space-y-8">
           
@@ -77,8 +75,10 @@ export default function SettingsPage() {
                   Administra el acceso a módulos sensibles. Solo usuarios con nivel jerárquico 1 pueden ver esta página.
                 </p>
               </div>
-              <div className="rounded-3xl bg-slate-50 px-4 py-3 text-sm text-slate-700 border border-slate-200">
-                Tu nivel: <strong>{session.nivel_jerarquia}</strong> • Rol: <strong>{session.rol ?? "Desconocido"}</strong>
+              <div className="rounded-3xl bg-slate-50 px-4 py-3 text-sm text-slate-700 border border-slate-200 flex flex-wrap gap-x-3">
+                <span>Tu nivel: <strong>{session.nivel_jerarquia}</strong></span>
+                <span className="text-slate-300">|</span>
+                <span>Rol: <strong>{session.rol ?? "Desconocido"}</strong></span>
               </div>
             </div>
 
@@ -107,7 +107,6 @@ export default function SettingsPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          {/* El Selector dinámico de niveles */}
                           <select
                             value={user.nivel_jerarquia}
                             onChange={(e) => handleCambiarNivel(user.id, Number(e.target.value))}

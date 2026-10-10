@@ -18,7 +18,8 @@ export default function LotesPage() {
   const [movimientosModalOpen, setMovimientosModalOpen] = useState(false);
   const [selectedLote, setSelectedLote] = useState<Lote | null>(null);
 
-  // Inputs Formulario (Identificador, Producto y Estado ahora son automáticos)
+  // Inputs Formulario Manuales
+  const [camionInput, setCamionInput] = useState("");
   const [kilosInput, setKilosInput] = useState<number | "">(""); 
 
   // Carga inicial de datos desde Supabase / Servidor
@@ -41,44 +42,31 @@ export default function LotesPage() {
     loadData();
   }, []);
 
-  // Calcular automáticamente el siguiente identificador correlativo (Ej: Lote-1, Lote-2...)
-  const siguienteLoteId = useMemo(() => {
-    if (lotes.length === 0) return "Lote-1";
-
-    // Extraemos los números consecutivos de las cadenas existentes en la BD
-    const numeros = lotes
-      .map((l) => {
-        const match = l.camion.match(/\d+/);
-        return match ? parseInt(match[0], 10) : 0;
-      })
-      .filter((n) => !isNaN(n));
-
-    const maxNumero = numeros.length > 0 ? Math.max(...numeros) : 0;
-    return `Lote-${maxNumero + 1}`;
-  }, [lotes]);
-
   // Sumatoria global de los kilos que quedan en inventario
   const totalKilos = useMemo(() => {
     return lotes.reduce((sum, lote) => sum + (lote.kilos || 0), 0);
   }, [lotes]);
 
-  // Manejador para enviar el nuevo registro
+  // Manejador para enviar el nuevo registro con datos manuales
   async function crearLote() {
+    const camionNombre = camionInput.trim();
     const kilosNumericos = Number(kilosInput);
-    if (kilosNumericos <= 0) return;
+
+    if (!camionNombre || kilosNumericos <= 0) return;
 
     const item: NewLote = {
-      camion: siguienteLoteId, // Pasa automáticamente como "Lote-X"
+      camion: camionNombre,          // Identificador ingresado por el usuario
       fecha: new Date().toLocaleDateString("es-ES"),
-      producto: initialProduct,   // Fijo por defecto 'Yaca'
+      producto: initialProduct,       // Fijo por defecto 'Yaca'
       kilos: kilosNumericos,
-      estado: "Descargando",      // Inicia directamente en proceso de descarga
+      estado: "Descargando",          // Inicia directamente en proceso de descarga
     };
 
     try {
       const nuevo = await createLoteAction(item);
       setLotes([nuevo, ...lotes]);
       setModalOpen(false);
+      setCamionInput("");
       setKilosInput("");
     } catch (error) {
       console.error("❌ Error al crear lote:", error);
@@ -172,7 +160,7 @@ export default function LotesPage() {
           </div>
         </section>
 
-        {/* Modal de Creación de Lote Avanzado y Ultra Rápido */}
+        {/* Modal de Creación de Lote con Campos Manuales */}
         {modalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm px-4 py-6">
             <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 sm:p-8">
@@ -182,7 +170,7 @@ export default function LotesPage() {
                 <div>
                   <h2 className="text-xl font-semibold text-slate-900">Registrar Entrada</h2>
                   <p className="text-xs text-slate-500 mt-1">
-                    Se generará automáticamente el <span className="font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded">{siguienteLoteId}</span> para el procesamiento de Yaca.
+                    Ingresa manualmente el nombre del lote/camión y sus kilos iniciales para Yaca.
                   </p>
                 </div>
                 <button 
@@ -194,8 +182,24 @@ export default function LotesPage() {
                 </button>
               </div>
 
-              {/* Formulario de Campo Único Inteligente */}
+              {/* Formulario Manual */}
               <div className="mt-6 space-y-4">
+                {/* Input para el Nombre del Lote / Camión */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    Nombre o Identificador del Lote
+                  </label>
+                  <input 
+                    type="text" 
+                    autoFocus
+                    value={camionInput} 
+                    onChange={(e) => setCamionInput(e.target.value)} 
+                    placeholder="Ej. Lote-45 o Camión Juan" 
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3.5 text-base font-semibold text-slate-900 placeholder-slate-400 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10"
+                  />
+                </div>
+
+                {/* Input para los Kilos */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wider text-slate-600">
                     Kilos Iniciales del Lote
@@ -205,10 +209,9 @@ export default function LotesPage() {
                     <input 
                       type="number" 
                       min={1}
-                      autoFocus
                       value={kilosInput} 
                       onChange={(e) => setKilosInput(e.target.value === "" ? "" : Number(e.target.value))} 
-                      placeholder="Ingresa el peso bruto (Ej. 45000)" 
+                      placeholder="Ej. 45000" 
                       className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 pl-12 pr-4 py-3.5 text-base font-semibold text-slate-900 placeholder-slate-400 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10"
                     />
                   </div>

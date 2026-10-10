@@ -8,7 +8,8 @@ import { getEmployeeSession } from "@/lib/employeeSession";
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [session, setSession] = useState(() => getEmployeeSession());
+  // Inicializamos en null para prevenir conflictos de hidratación en Next.js
+  const [session, setSession] = useState<any>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -22,10 +23,17 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
 
   const isActive = (path: string) => pathname === path;
 
+  // Evitamos renderizar hasta que cargue la sesión para evitar parpadeos
+  if (!session) {
+    return null;
+  }
+
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900 font-sans">
-      {/* SIDEBAR PARA ESCRITORIO */}
-      <aside className="w-72 border-r border-slate-200/80 bg-white p-6 hidden md:flex flex-col justify-between shadow-sm">
+      {/* =========================================================================
+          SIDEBAR PARA ESCRITORIO (Oculto en móvil)
+          ========================================================================= */}
+      <aside className="w-72 border-r border-slate-200/80 bg-white p-6 hidden md:flex flex-col justify-between shadow-sm shrink-0">
         <div>
           {/* Cabecera del Sidebar */}
           <div className="mb-8 px-2">
@@ -78,19 +86,22 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         {/* Tarjeta inferior de sesión */}
         <div className="pt-4 border-t border-slate-100 px-2">
           <div className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-200/60">
-            <div>
-              <p className="text-xs font-bold text-slate-800 truncate max-w-[120px]">
+            <div className="overflow-hidden pr-2">
+              <p className="text-xs font-bold text-slate-800 truncate">
                 {session?.nombre || "Colaborador"}
               </p>
               <p className="text-[10px] text-slate-500 font-medium">Nivel {session?.nivel_jerarquia ?? "?"}</p>
             </div>
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-500/10"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-500/10 shrink-0"></span>
           </div>
         </div>
       </aside>
 
-      {/* CONTENEDOR PRINCIPAL */}
+      {/* =========================================================================
+          CONTENEDOR PRINCIPAL Y VISTA MÓVIL
+          ========================================================================= */}
       <div className="flex-1 flex flex-col min-w-0">
+        
         {/* BARRA SUPERIOR MÓVIL (Visible solo en pantallas chicas) */}
         <header className="md:hidden flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sticky top-0 z-30 shadow-sm">
           <div className="flex items-center gap-2">
@@ -99,7 +110,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
           <button 
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-xl bg-slate-100 text-slate-700 font-bold text-sm"
+            className="p-2 rounded-xl bg-slate-100 text-slate-700 font-bold text-sm transition active:scale-95"
           >
             {mobileMenuOpen ? "✕ Cerrar" : "☰ Menú"}
           </button>
@@ -107,29 +118,35 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
 
         {/* MENÚ MÓVIL DESPLEGABLE */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-white border-b border-slate-200 p-4 space-y-3 shadow-lg z-20">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Módulos</p>
+          <div className="md:hidden bg-white border-b border-slate-200 p-4 space-y-3 shadow-lg z-20 animate-fadeIn">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Módulos de Configuración</p>
             <div className="space-y-1">
               <Link 
                 href="/settings" 
                 onClick={() => setMobileMenuOpen(false)}
-                className={`block rounded-xl px-4 py-2.5 text-sm font-medium ${isActive("/settings") ? "bg-purple-600 text-white" : "text-slate-700 hover:bg-slate-100"}`}
+                className={`block rounded-xl px-4 py-2.5 text-sm font-medium ${isActive("/settings") ? "bg-purple-600 text-white font-semibold" : "text-slate-700 hover:bg-slate-100"}`}
               >
                 General
               </Link>
               <Link 
                 href="/settings/usuarios" 
                 onClick={() => setMobileMenuOpen(false)}
-                className={`block rounded-xl px-4 py-2.5 text-sm font-medium ${isActive("/settings/usuarios") ? "bg-purple-600 text-white" : "text-slate-700 hover:bg-slate-100"}`}
+                className={`block rounded-xl px-4 py-2.5 text-sm font-medium ${isActive("/settings/usuarios") ? "bg-purple-600 text-white font-semibold" : "text-slate-700 hover:bg-slate-100"}`}
               >
                 Usuarios y Permisos
               </Link>
             </div>
+            
+            {/* Info de sesión rápida en móvil */}
+            <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 px-1">
+              <span>Conectado como: <strong>{session?.nombre}</strong></span>
+              <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-medium">Nivel {session?.nivel_jerarquia}</span>
+            </div>
           </div>
         )}
 
-        {/* CONTENIDO DE LA PÁGINA */}
-        <main className="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto">
+        {/* CONTENIDO DE LA PÁGINA (Ajustado responsivamente) */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           {children}
         </main>
       </div>
