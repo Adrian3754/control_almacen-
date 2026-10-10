@@ -78,6 +78,7 @@ export default function HomePage() {
             <div className="pt-2 border-t border-slate-100">
               <Link 
                 href="/login" 
+                onClick={() => setMobileMenuOpen(false)}
                 className="block text-center rounded-full bg-sky-600 py-2.5 text-sm font-semibold text-white shadow-sm"
               >
                 Iniciar Sesión
