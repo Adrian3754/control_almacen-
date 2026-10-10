@@ -5,6 +5,7 @@ const modules = [
   { href: "/lotes", label: "Lotes", description: "Consulta y registra lotes", icon: "📋" },
   { href: "/movimientos", label: "Movimientos", description: "Entradas y salidas", icon: "🔄" },
   { href: "/inventario", label: "Materiales y compras", description: "Existencias y recepciones por área", icon: "🧰" },
+  { href: "/cortes", label: "Cortes", description: "Registro de placas, productores, peso y lote", icon: "🌿" },
   { href: "/tarimas", label: "Tarimas", description: "Administra tarimas", icon: "📦" },
   { href: "/calidad/muestreo", label: "Calidad", description: "Registro de muestreos", icon: "✅" },
   { href: "/sorteo", label: "Sorteo", description: "Consulta el módulo de sorteo", icon: "🎯" },
