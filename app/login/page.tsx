@@ -52,6 +52,9 @@ export default function LoginPage() {
         cargo: perfil.cargo ?? undefined,
         rol: perfil.rol ?? undefined,
         nivel_jerarquia: perfil.nivel_jerarquia ?? undefined,
+        telefono: perfil.telefono ?? "",
+        email: "",
+        foto: "",
         loggedAt: new Date().toISOString(),
       });
       router.push("/");

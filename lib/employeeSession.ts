@@ -4,6 +4,9 @@ export type EmployeeSession = {
   cargo?: string;
   rol?: "Administrador" | "Encargado" | "Operador";
   nivel_jerarquia?: number;
+  telefono?: string;
+  email?: string;
+  foto?: string;
   loggedAt: string;
 };
 
