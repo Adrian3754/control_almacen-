@@ -13,6 +13,7 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
+  deploymentId: process.env.VERCEL_GIT_COMMIT_SHA || process.env.NEXT_DEPLOYMENT_ID,
   allowedDevOrigins: ["127.0.0.1", "localhost", "192.168.1.113"],
   /* ... tus otras configuraciones si tienes (ej. imágenes, etc.) ... */
   
