@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
+  actualizarRegistroCorteAction,
   crearProveedorFrutaAction,
   crearRegistroCorteAction,
+  eliminarRegistroCorteAction,
   getProveedoresFrutaAction,
   getRegistrosCorteAction,
   type ProveedorFruta,
@@ -59,6 +61,8 @@ export default function CortesPage() {
   const [registros, setRegistros] = useState<RegistroCorte[]>([]);
   const [proveedores, setProveedores] = useState<ProveedorFruta[]>([]);
   const [form, setForm] = useState<RegistroCorteInput>(emptyForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [nombreProveedor, setNombreProveedor] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -143,14 +147,68 @@ export default function CortesPage() {
     setSuccess("");
 
     try {
-      await crearRegistroCorteAction(form);
+      if (editingId) {
+        await actualizarRegistroCorteAction(editingId, form);
+      } else {
+        await crearRegistroCorteAction(form);
+      }
       setForm(emptyForm());
-      setSuccess("Recepción de fruta guardada correctamente.");
+      setEditingId(null);
+      setSuccess(editingId ? "Recepción actualizada correctamente." : "Recepción de fruta guardada correctamente.");
       setRegistros(await getRegistrosCorteAction());
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "No se pudo guardar el registro.");
+      setError(submitError instanceof Error ? submitError.message : "No se pudo guardar la recepción.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  function handleEditReception(registro: RegistroCorte) {
+    setForm({
+      fecha: registro.fecha,
+      lugar_origen: registro.lugar_origen,
+      proveedor_id: registro.proveedor_id,
+      factura_flete: registro.factura_flete ?? "",
+      fecha_pago_flete: registro.fecha_pago_flete ?? "",
+      viajes: registro.viajes,
+      numero_lotes: registro.numero_lotes,
+      peso_kg: registro.peso_kg,
+      peso_real_kg: registro.peso_real_kg,
+      precio_unitario_kg: registro.precio_unitario_kg,
+      factura_ruta: registro.factura_ruta ?? "",
+      fecha_factura_ruta: registro.fecha_factura_ruta ?? "",
+    });
+    setEditingId(registro.id);
+    setError("");
+    setSuccess("");
+    document.getElementById("recepcion-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function handleCancelEdit() {
+    setEditingId(null);
+    setForm(emptyForm());
+    setError("");
+    setSuccess("");
+  }
+
+  async function handleDeleteReception(registro: RegistroCorte) {
+    const confirmed = window.confirm(
+      `¿Eliminar la recepción No. ${registro.numero_registro} de ${registro.proveedor_nombre || registro.lugar_origen}? Esta acción no se puede deshacer.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(registro.id);
+    setError("");
+    setSuccess("");
+    try {
+      await eliminarRegistroCorteAction(registro.id);
+      setRegistros(await getRegistrosCorteAction());
+      setSuccess(`Recepción No. ${registro.numero_registro} eliminada correctamente.`);
+      if (editingId === registro.id) handleCancelEdit();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "No se pudo eliminar la recepción.");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -218,9 +276,11 @@ export default function CortesPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+        <section id="recepcion-form" className="scroll-mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           <div className="mb-5">
-            <h2 className="text-lg font-bold text-slate-900">Nueva recepción</h2>
+            <h2 className="text-lg font-bold text-slate-900">
+              {editingId ? "Editar recepción" : "Nueva recepción"}
+            </h2>
             <p className="mt-1 text-sm text-slate-500">
               El 5% se calcula sobre el peso de campo; el flete incluye IVA del 16%. Los importes se recalculan al guardar.
             </p>
@@ -313,9 +373,16 @@ export default function CortesPage() {
               <span className="mt-1 block text-xs font-normal text-slate-500">Fecha en que se realizó esa factura.</span>
             </label>
             <div className="flex items-end sm:col-span-2 lg:col-span-1">
-              <button type="submit" disabled={saving || proveedores.length === 0} className="min-h-11 w-full rounded-xl bg-emerald-800 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60">
-                {saving ? "Guardando..." : "Guardar recepción"}
-              </button>
+              <div className="flex w-full gap-2">
+                <button type="submit" disabled={saving || proveedores.length === 0} className="min-h-11 flex-1 rounded-xl bg-emerald-800 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60">
+                  {saving ? "Guardando..." : editingId ? "Guardar cambios" : "Guardar recepción"}
+                </button>
+                {editingId ? (
+                  <button type="button" onClick={handleCancelEdit} disabled={saving} className="min-h-11 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
+                    Cancelar
+                  </button>
+                ) : null}
+              </div>
             </div>
           </form>
 
@@ -371,7 +438,7 @@ export default function CortesPage() {
                 <table className="min-w-[1900px] text-left text-sm">
                   <thead className="bg-emerald-950 text-white">
                     <tr>
-                      {["No.", "Día", "Lugar de origen", "Proveedor", "Costo flete", "Factura flete", "Fecha pago flete", "Viajes", "No. lotes", "Peso de campo kg", "5% kg", "Ingreso real kg", "Diferencia kg", "Precio unit. kg", "Cantidad total", "Factura ruta", "Fecha factura ruta"].map((heading) => (
+                      {["No.", "Día", "Lugar de origen", "Proveedor", "Costo flete", "Factura flete", "Fecha pago flete", "Viajes", "No. lotes", "Peso de campo kg", "5% kg", "Ingreso real kg", "Diferencia kg", "Precio unit. kg", "Cantidad total", "Factura ruta", "Fecha factura ruta", "Acciones"].map((heading) => (
                         <th key={heading} className="whitespace-nowrap px-3 py-3 font-semibold">{heading}</th>
                       ))}
                     </tr>
@@ -396,6 +463,16 @@ export default function CortesPage() {
                         <td className="whitespace-nowrap px-3 py-3 font-semibold">{money(registro.cantidad_total)}</td>
                         <td className="px-3 py-3">{registro.factura_ruta || "—"}</td>
                         <td className="whitespace-nowrap px-3 py-3">{displayDate(registro.fecha_factura_ruta)}</td>
+                        <td className="whitespace-nowrap px-3 py-3">
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => handleEditReception(registro)} disabled={deletingId !== null} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50">
+                              Editar
+                            </button>
+                            <button type="button" onClick={() => void handleDeleteReception(registro)} disabled={deletingId !== null || saving} className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50">
+                              {deletingId === registro.id ? "Eliminando..." : "Eliminar"}
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -424,6 +501,14 @@ export default function CortesPage() {
                       <div><dt className="text-xs text-slate-500">Fecha factura ruta</dt><dd className="mt-0.5 text-slate-800">{displayDate(registro.fecha_factura_ruta)}</dd></div>
                       <div><dt className="text-xs text-slate-500">Precio unitario</dt><dd className="mt-0.5 text-slate-800">{money(registro.precio_unitario_kg)} por kg</dd></div>
                     </dl>
+                    <div className="mt-4 flex gap-2 border-t border-slate-100 pt-4">
+                      <button type="button" onClick={() => handleEditReception(registro)} disabled={deletingId !== null} className="min-h-10 flex-1 rounded-xl border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50">
+                        Editar
+                      </button>
+                      <button type="button" onClick={() => void handleDeleteReception(registro)} disabled={deletingId !== null || saving} className="min-h-10 flex-1 rounded-xl border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50">
+                        {deletingId === registro.id ? "Eliminando..." : "Eliminar"}
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>

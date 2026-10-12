@@ -272,3 +272,51 @@ export async function crearRegistroCorteAction(input: RegistroCorteInput) {
   revalidatePath("/cortes");
   return { success: true };
 }
+
+export async function actualizarRegistroCorteAction(id: string, input: RegistroCorteInput) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    throw new Error("Selecciona una recepción válida para editar.");
+  }
+
+  const values = prepareRegistroCorte(input);
+  const { supabase } = await getAuthenticatedEmployee();
+  await validateActiveProvider(supabase, values.proveedor_id);
+  const { data, error } = await supabase
+    .from("registro_cortes")
+    .update(values)
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error al actualizar registro de recepción de fruta:", error.message);
+    throw new Error("No se pudo actualizar la recepción. Verifica los datos e intenta de nuevo.");
+  }
+  if (!data) throw new Error("No se encontró la recepción que intentas editar.");
+
+  revalidatePath("/cortes");
+  return { success: true };
+}
+
+export async function eliminarRegistroCorteAction(id: string) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    throw new Error("Selecciona una recepción válida para eliminar.");
+  }
+
+  const { supabase } = await getAuthenticatedEmployee();
+  const { data, error } = await supabase
+    .from("registro_cortes")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error al eliminar registro de recepción de fruta:", error.message);
+    throw new Error("No se pudo eliminar la recepción. Intenta de nuevo.");
+  }
+  if (!data) throw new Error("No se encontró la recepción que intentas eliminar.");
+
+  revalidatePath("/cortes");
+  return { success: true };
+}
