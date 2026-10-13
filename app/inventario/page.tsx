@@ -30,6 +30,18 @@ const measurementUnits = [
   "Rollos",
 ];
 
+const inventoryAreas = [
+  { name: "Lavado de fruta", id: "lavado-de-fruta", icon: "🍋", description: "Insumos para el lavado de fruta", color: "bg-lime-50 text-lime-800 ring-lime-200" },
+  { name: "Lavado de caja", id: "lavado-de-caja", icon: "🧺", description: "Materiales para lavado de cajas", color: "bg-sky-50 text-sky-800 ring-sky-200" },
+  { name: "Mantenimiento", id: "mantenimiento", icon: "🛠️", description: "Herramientas y refacciones", color: "bg-orange-50 text-orange-800 ring-orange-200" },
+  { name: "Inocuidad", id: "inocuidad", icon: "✅", description: "Materiales de higiene e inocuidad", color: "bg-emerald-50 text-emerald-800 ring-emerald-200" },
+  { name: "Limpieza y sanitización", id: "limpieza-y-sanitizacion", icon: "🧹", description: "Limpieza de las instalaciones", color: "bg-violet-50 text-violet-800 ring-violet-200" },
+] as const;
+
+function normalizeArea(area: string) {
+  return area.trim().toLocaleLowerCase("es-MX");
+}
+
 function formatQuantity(value: number) {
   return new Intl.NumberFormat("es-MX", { maximumFractionDigits: 3 }).format(value);
 }
@@ -137,16 +149,18 @@ function MaterialSelect({
   materials,
   value,
   onChange,
+  disabled = false,
 }: {
   materials: MaterialArea[];
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <label className="block text-sm font-medium text-slate-700">
       Material y área
-      <select required value={value} onChange={(event) => onChange(event.target.value)} className={fieldClass}>
-        <option value="">Selecciona un material</option>
+      <select required disabled={disabled} value={value} onChange={(event) => onChange(event.target.value)} className={fieldClass}>
+        <option value="">{disabled ? "Primero selecciona un área" : "Selecciona un material"}</option>
         {materials.map((material) => (
           <option key={material.id} value={material.id}>
             {material.nombre} · {material.area} ({formatQuantity(material.stock_actual)} {material.unidad})
@@ -157,12 +171,18 @@ function MaterialSelect({
   );
 }
 
-function MaterialsTable({ materials }: { materials: MaterialArea[] }) {
+function MaterialsTable({
+  materials,
+  emptyMessage = "Agrega materiales y define el mínimo que necesita cada área.",
+}: {
+  materials: MaterialArea[];
+  emptyMessage?: string;
+}) {
   if (materials.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-300 px-5 py-10 text-center">
         <p className="font-semibold text-slate-800">Aún no hay materiales registrados</p>
-        <p className="mt-1 text-sm text-slate-500">Agrega materiales y define el mínimo que necesita cada área.</p>
+        <p className="mt-1 text-sm text-slate-500">{emptyMessage}</p>
       </div>
     );
   }
@@ -355,6 +375,7 @@ export default function InventarioPage() {
     stock_minimo: "",
   });
   const [purchaseForm, setPurchaseForm] = useState({
+    area: "",
     material_id: "",
     proveedor: "",
     referencia: "",
@@ -481,6 +502,7 @@ export default function InventarioPage() {
         detalle: purchaseForm.detalle,
       });
       setPurchaseForm({
+        area: "",
         material_id: "",
         proveedor: "",
         referencia: "",
@@ -564,6 +586,14 @@ export default function InventarioPage() {
   const totalMaterials = materials.length;
   const materialsLow = lowMaterials.length;
   const areaCount = new Set(materials.map((material) => material.area)).size;
+  const knownAreaNames = new Set(inventoryAreas.map((area) => normalizeArea(area.name)));
+  const purchaseMaterials = purchaseForm.area
+    ? materials.filter((material) => normalizeArea(material.area) === normalizeArea(purchaseForm.area))
+    : [];
+  const materialsByOtherArea = materials.filter(
+    (material) => !knownAreaNames.has(normalizeArea(material.area))
+  );
+  const otherAreaNames = [...new Set(materialsByOtherArea.map((material) => material.area))];
 
   if (!sessionReady || loading) {
     return (
@@ -634,12 +664,64 @@ export default function InventarioPage() {
               </div>
             ) : null}
 
-            <Section
-              title="Existencias por área"
-              description="El estado se compara contra el mínimo definido para cada material."
-            >
-              <MaterialsTable materials={materials} />
-            </Section>
+            <section className="space-y-5">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Áreas de compras</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Selecciona un área para consultar sus materiales. Cada tabla muestra existencias y mínimos.
+                </p>
+              </div>
+              <nav aria-label="Áreas de compras" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {inventoryAreas.map((area) => {
+                  const areaMaterials = materials.filter(
+                    (material) => normalizeArea(material.area) === normalizeArea(area.name)
+                  );
+                  return (
+                    <a
+                      key={area.id}
+                      href={`#${area.id}`}
+                      className={`flex items-center gap-3 rounded-2xl px-4 py-3 ring-1 transition hover:-translate-y-0.5 hover:shadow-sm ${area.color}`}
+                    >
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/80 text-xl" aria-hidden="true">{area.icon}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold">{area.name}</span>
+                        <span className="mt-0.5 block text-xs opacity-80">{area.description}</span>
+                      </span>
+                      <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-bold">{areaMaterials.length}</span>
+                    </a>
+                  );
+                })}
+              </nav>
+
+              <div className="space-y-4">
+                {inventoryAreas.map((area) => {
+                  const areaMaterials = materials.filter(
+                    (material) => normalizeArea(material.area) === normalizeArea(area.name)
+                  );
+                  return (
+                    <div key={area.id} id={area.id} className="scroll-mt-6">
+                      <Section
+                        title={`${area.icon} ${area.name}`}
+                        description={area.description}
+                      >
+                        <MaterialsTable
+                          materials={areaMaterials}
+                          emptyMessage={`Agrega materiales y asígnalos a ${area.name}.`}
+                        />
+                      </Section>
+                    </div>
+                  );
+                })}
+                {materialsByOtherArea.length > 0 ? (
+                  <Section
+                    title="Otras áreas registradas"
+                    description={`Se conservan aquí materiales anteriores asignados a: ${otherAreaNames.join(", ")}.`}
+                  >
+                    <MaterialsTable materials={materialsByOtherArea} />
+                  </Section>
+                ) : null}
+              </div>
+            </section>
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
               <Section title="Alertas para Compras" description="Avisos creados al bajar del mínimo. Los correos fallidos se pueden reintentar.">
@@ -672,7 +754,12 @@ export default function InventarioPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block text-sm font-medium text-slate-700">
                 Área
-                <input required maxLength={100} value={materialForm.area} onChange={(event) => setMaterialForm({ ...materialForm, area: event.target.value })} className={fieldClass} placeholder="Ej. Empaque" />
+                <select required value={materialForm.area} onChange={(event) => setMaterialForm({ ...materialForm, area: event.target.value })} className={fieldClass}>
+                  <option value="">Selecciona un área</option>
+                  {inventoryAreas.map((area) => (
+                    <option key={area.id} value={area.name}>{area.name}</option>
+                  ))}
+                </select>
               </label>
               <label className="block text-sm font-medium text-slate-700">
                 Unidad
@@ -707,11 +794,31 @@ export default function InventarioPage() {
           onClose={() => setDialog(null)}
         >
           <form onSubmit={handleRegisterPurchase} className="space-y-4">
+            <label className="block text-sm font-medium text-slate-700">
+              Área
+              <select
+                required
+                value={purchaseForm.area}
+                onChange={(event) => setPurchaseForm({ ...purchaseForm, area: event.target.value, material_id: "" })}
+                className={fieldClass}
+              >
+                <option value="">Selecciona un área</option>
+                {inventoryAreas.map((area) => (
+                  <option key={area.id} value={area.name}>{area.name}</option>
+                ))}
+              </select>
+            </label>
             <MaterialSelect
-              materials={materials}
+              materials={purchaseMaterials}
               value={purchaseForm.material_id}
               onChange={(value) => setPurchaseForm({ ...purchaseForm, material_id: value })}
+              disabled={!purchaseForm.area}
             />
+            {purchaseForm.area && purchaseMaterials.length === 0 ? (
+              <p className="-mt-2 text-xs text-amber-800">
+                No hay materiales registrados para esta área. Registra primero el material en el inventario.
+              </p>
+            ) : null}
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block text-sm font-medium text-slate-700">
                 Cantidad solicitada

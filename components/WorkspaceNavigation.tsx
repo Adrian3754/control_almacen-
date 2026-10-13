@@ -20,6 +20,7 @@ const navigationItems = [
   { href: "/movimientos", label: "Movimientos", icon: "🔄", minLevel: 3 },
   { href: "/inventario", label: "Materiales y compras", icon: "🧰", minLevel: 3 },
   { href: "/cortes", label: "Cortes", icon: "🌿", minLevel: 3 },
+  { href: "/mermas", label: "Gráfica de mermas", icon: "📊", minLevel: 3 },
   { href: "/tarimas", label: "Tarimas", icon: "📦", minLevel: 3 },
   { href: "/calidad/muestreo", label: "Calidad", icon: "✅", minLevel: 3 },
   { href: "/sorteo", label: "Sorteo", icon: "🎯", minLevel: 3 },
