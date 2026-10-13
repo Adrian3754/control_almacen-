@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   createMaterialAreaAction,
+  getConsumptionMaterialsAction,
   getInventoryDataAction,
   registerMaterialMovementAction,
   retryMaterialAlertAction,
   type AlertaMaterial,
   type MaterialArea,
+  type MaterialConsumo,
   type MovimientoMaterial,
 } from "@/components/actions/inventario-materiales.actions";
 import { getEmployeeSession, type EmployeeSession } from "@/lib/employeeSession";
@@ -151,7 +153,7 @@ function MaterialSelect({
   onChange,
   disabled = false,
 }: {
-  materials: MaterialArea[];
+  materials: MaterialConsumo[];
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
@@ -163,7 +165,7 @@ function MaterialSelect({
         <option value="">{disabled ? "Primero selecciona un área" : "Selecciona un material"}</option>
         {materials.map((material) => (
           <option key={material.id} value={material.id}>
-            {material.nombre} · {material.area} ({formatQuantity(material.stock_actual)} {material.unidad})
+            {material.nombre} · {material.area} ({material.unidad})
           </option>
         ))}
       </select>
@@ -360,6 +362,7 @@ export default function InventarioPage() {
     movimientos: MovimientoMaterial[];
     alertas: AlertaMaterial[];
   } | null>(null);
+  const [consumptionMaterials, setConsumptionMaterials] = useState<MaterialConsumo[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -391,6 +394,7 @@ export default function InventarioPage() {
   });
 
   const canManage = Number(session?.nivel_jerarquia ?? 3) <= 2;
+  const isConsumptionOnly = Number(session?.nivel_jerarquia) === 4;
   const lowMaterials = useMemo(
     () => (data?.materiales ?? []).filter(lowStock),
     [data?.materiales]
@@ -416,10 +420,16 @@ export default function InventarioPage() {
   useEffect(() => {
     if (!sessionReady || !session) return;
     let active = true;
-    getInventoryDataAction()
-      .then((inventory) => {
+    const inventoryRequest = isConsumptionOnly
+      ? getConsumptionMaterialsAction().then((materials) => {
+          if (active) setConsumptionMaterials(materials);
+        })
+      : getInventoryDataAction().then((inventory) => {
+          if (active) setData(inventory);
+        });
+    inventoryRequest
+      .then(() => {
         if (active) {
-          setData(inventory);
           setLoadError("");
         }
       })
@@ -434,7 +444,7 @@ export default function InventarioPage() {
     return () => {
       active = false;
     };
-  }, [session, sessionReady, refreshVersion]);
+  }, [isConsumptionOnly, session, sessionReady, refreshVersion]);
 
   const updateData = () => setRefreshVersion((version) => version + 1);
 
@@ -600,6 +610,54 @@ export default function InventarioPage() {
       <main className="min-h-[60vh] px-4 py-10 sm:px-6">
         <div className="mx-auto max-w-7xl animate-pulse rounded-3xl border border-slate-200 bg-white p-8 text-sm text-slate-500 shadow-sm">
           Cargando inventario de materiales...
+        </div>
+      </main>
+    );
+  }
+
+  if (isConsumptionOnly) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-emerald-50/50 via-slate-50 to-amber-50/30 px-4 py-8 sm:px-6 sm:py-12">
+        <div className="mx-auto max-w-2xl space-y-5">
+          <header className="rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm sm:p-8">
+            <p className="text-sm font-semibold uppercase tracking-wider text-emerald-700">M. López · Materiales y compras</p>
+            <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Registrar consumo</h1>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Selecciona el material utilizado e indica la cantidad para registrar su consumo.
+            </p>
+          </header>
+          <FeedbackBanner feedback={feedback} />
+          {loadError ? (
+            <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+              {loadError}
+            </div>
+          ) : null}
+          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+            {consumptionMaterials.length === 0 && !loadError ? (
+              <p className="mb-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                No hay materiales activos para registrar. Comunícate con tu supervisor.
+              </p>
+            ) : null}
+            <form onSubmit={handleRegisterConsumption} className="space-y-4">
+              <MaterialSelect
+                materials={consumptionMaterials}
+                value={consumptionForm.material_id}
+                onChange={(value) => setConsumptionForm({ ...consumptionForm, material_id: value })}
+                disabled={consumptionMaterials.length === 0}
+              />
+              <label className="block text-sm font-medium text-slate-700">
+                Cantidad consumida
+                <input required type="number" min="0.001" step="0.001" value={consumptionForm.cantidad} onChange={(event) => setConsumptionForm({ ...consumptionForm, cantidad: event.target.value })} className={fieldClass} />
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                Nota (opcional)
+                <input maxLength={500} value={consumptionForm.detalle} onChange={(event) => setConsumptionForm({ ...consumptionForm, detalle: event.target.value })} className={fieldClass} />
+              </label>
+              <button type="submit" disabled={busy || consumptionMaterials.length === 0} className={primaryButtonClass}>
+                {busy ? "Registrando..." : "Guardar consumo"}
+              </button>
+            </form>
+          </section>
         </div>
       </main>
     );

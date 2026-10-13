@@ -16,6 +16,8 @@ export type MaterialArea = {
   created_at: string;
 };
 
+export type MaterialConsumo = Pick<MaterialArea, "id" | "nombre" | "area" | "unidad">;
+
 export type MovimientoMaterial = {
   id: string;
   material_id: string;
@@ -171,6 +173,24 @@ export async function getInventoryDataAction(): Promise<InventoryData> {
   };
 }
 
+export async function getConsumptionMaterialsAction(): Promise<MaterialConsumo[]> {
+  await requireActor(4);
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("materiales_area")
+    .select("id, nombre, area, unidad")
+    .eq("activo", true)
+    .order("area", { ascending: true })
+    .order("nombre", { ascending: true });
+
+  if (error) {
+    console.error("Error cargando materiales para registrar consumo:", error.message);
+    throw new Error(explainDatabaseError(error.message));
+  }
+
+  return data ?? [];
+}
+
 export async function createMaterialAreaAction(input: {
   nombre: string;
   area: string;
@@ -244,7 +264,7 @@ export async function registerMaterialMovementAction(input: {
   costo_unitario?: number;
   detalle?: string;
 }): Promise<{ movimiento: RpcMovementResult; correo: EmailResult | null }> {
-  const actor = await requireActor(input.tipo === "consumo" ? 3 : 2);
+  const actor = await requireActor(input.tipo === "consumo" ? 4 : 2);
 
   if (!input.material_id || !Number.isFinite(input.cantidad) || Math.abs(input.cantidad) > 1_000_000_000) {
     throw new Error("Selecciona un material e ingresa una cantidad válida.");

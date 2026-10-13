@@ -26,6 +26,7 @@ const Icons = {
 
 export default function Home() {
   const [session, setSession] = useState<EmployeeSession | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
   const [stats, setStats] = useState({
     kilosDisponibles: 0,
     kilosCuartoFrio: 0,
@@ -39,6 +40,7 @@ export default function Home() {
     const loadSession = () => {
       const current = getEmployeeSession();
       setSession(current);
+      setSessionReady(true);
     };
 
     loadSession();
@@ -57,10 +59,16 @@ export default function Home() {
 
   useEffect(() => {
     const loadStats = async () => {
+      if (!session) return;
+      if (Number(session.nivel_jerarquia) === 4) {
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         
-        const [tarimas, inventory, movimientos, conteoLotes] = await Promise.all([
+        const [tarimas, , movimientos, conteoLotes] = await Promise.all([
           fetchTarimas(),
           fetchInventoryItems(),
           fetchMovimientos(),
@@ -99,10 +107,48 @@ export default function Home() {
     };
 
     loadStats();
-  }, []);
+  }, [session]);
 
   const isAdmin = Number(session?.nivel_jerarquia) === 1;
   const isSupervisor = Number(session?.nivel_jerarquia) === 2;
+  const isConsumptionOnly = Number(session?.nivel_jerarquia) === 4;
+
+  if (!sessionReady) {
+    return (
+      <main className="flex min-h-[60vh] items-center justify-center px-4">
+        <p className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600 shadow-sm">
+          Cargando inicio...
+        </p>
+      </main>
+    );
+  }
+
+  if (isConsumptionOnly) {
+    return (
+      <main className="min-h-screen bg-linear-to-br from-emerald-50/70 via-slate-50 to-amber-50/60 px-4 py-8 sm:px-6 sm:py-12">
+        <div className="mx-auto max-w-4xl space-y-6">
+          <section className="rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm sm:p-9">
+            <p className="text-sm font-semibold uppercase tracking-wider text-emerald-700">M. López · Inicio</p>
+            <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+              Hola, {session?.nombre || session?.numero_empleado || "Usuario"} 👋
+            </h1>
+            <p className="mt-2 text-slate-600">Desde aquí puedes registrar el material que utilizó tu área.</p>
+          </section>
+          <Link
+            href="/inventario"
+            className="group flex items-center gap-5 rounded-3xl border border-emerald-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-8"
+          >
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-3xl" aria-hidden="true">📝</span>
+            <span className="flex-1">
+              <span className="block text-lg font-bold text-slate-900">Registrar consumo</span>
+              <span className="mt-1 block text-sm text-slate-600">Captura el material y la cantidad utilizada.</span>
+            </span>
+            <span className="text-xl font-semibold text-emerald-800 transition group-hover:translate-x-1" aria-hidden="true">→</span>
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   const quickLinks = [
     { href: "/inventario", label: "Nuevo Inventario", icon: "📝", color: "green", show: true },

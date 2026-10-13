@@ -14,11 +14,11 @@ import {
 } from "@/lib/employeeSession";
 
 const navigationItems = [
-  { href: "/dashboard", label: "Inicio", icon: "🏠", minLevel: 3 },
+  { href: "/dashboard", label: "Inicio", icon: "🏠", minLevel: 4 },
   { href: "/menu", label: "Menú de módulos", icon: "☷", minLevel: 3 },
   { href: "/lotes", label: "Lotes", icon: "📋", minLevel: 3 },
   { href: "/movimientos", label: "Movimientos", icon: "🔄", minLevel: 3 },
-  { href: "/inventario", label: "Materiales y compras", icon: "🧰", minLevel: 3 },
+  { href: "/inventario", label: "Materiales y compras", icon: "🧰", minLevel: 4 },
   { href: "/cortes", label: "Cortes", icon: "🌿", minLevel: 3 },
   { href: "/mermas", label: "Gráfica de mermas", icon: "📊", minLevel: 3 },
   { href: "/tarimas", label: "Tarimas", icon: "📦", minLevel: 3 },
@@ -76,7 +76,21 @@ export default function WorkspaceNavigation({
     }
   }, [isStandalonePage, router, session, sessionChecked]);
 
-  if (isStandalonePage) return children;
+  const userLevel = Number(session?.nivel_jerarquia ?? 3);
+  const isLevelFourRouteRestricted =
+    userLevel === 4 &&
+    pathname !== "/dashboard" &&
+    pathname !== "/inventario";
+
+  useEffect(() => {
+    if (sessionChecked && session && isLevelFourRouteRestricted) {
+      router.replace("/dashboard");
+    }
+  }, [isLevelFourRouteRestricted, router, session, sessionChecked]);
+
+  if (isStandalonePage && !(sessionChecked && session && userLevel === 4 && pathname === "/")) {
+    return children;
+  }
 
   if (!sessionChecked || !session) {
     return (
@@ -88,7 +102,16 @@ export default function WorkspaceNavigation({
     );
   }
 
-  const userLevel = Number(session.nivel_jerarquia ?? 3);
+  if (isLevelFourRouteRestricted) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <p className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600 shadow-sm">
+          Redirigiendo al inicio...
+        </p>
+      </main>
+    );
+  }
+
   const visibleItems = navigationItems.filter(
     (item) => userLevel <= item.minLevel
   );
