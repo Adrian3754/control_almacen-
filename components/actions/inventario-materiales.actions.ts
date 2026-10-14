@@ -38,6 +38,11 @@ export type MovimientoMaterial = {
   } | null;
 };
 
+export type RegistroConsumoMaterial = Pick<
+  MovimientoMaterial,
+  "id" | "material_id" | "cantidad" | "detalle" | "registrado_por" | "created_at" | "materiales_area"
+>;
+
 export type AlertaMaterial = {
   id: string;
   material_id: string;
@@ -53,9 +58,10 @@ export type AlertaMaterial = {
 
 type InventoryData = {
   materiales: MaterialArea[];
-  movimientos: MovimientoMaterial[];
-  alertas: AlertaMaterial[];
+  totalMateriales: number;
 };
+
+const INVENTORY_PAGE_SIZE = 50;
 
 type Actor = {
   numero_empleado: string;
@@ -137,51 +143,210 @@ function explainDatabaseError(message: string) {
   return message;
 }
 
-export async function getInventoryDataAction(): Promise<InventoryData> {
+export async function getInventoryDataAction(options: {
+  page?: number;
+  area?: string;
+} = {}): Promise<InventoryData> {
   await requireActor();
+  if (!options || typeof options !== "object") {
+    throw new Error("Los filtros del inventario no son válidos.");
+  }
   const supabase = createServerSupabaseClient();
 
-  const [materialsResult, movementsResult, alertsResult] = await Promise.all([
-    supabase
+  const requestedPage = options.page;
+  const page = typeof requestedPage === "number" &&
+    Number.isSafeInteger(requestedPage) &&
+    requestedPage > 0
+    ? requestedPage
+    : 1;
+  if (options.area !== undefined && typeof options.area !== "string") {
+    throw new Error("El área seleccionada no es válida.");
+  }
+  const area = options.area?.trim();
+  if (area && area.length > 100) {
+    throw new Error("El área seleccionada no es válida.");
+  }
+
+  let materialsQuery = supabase
+    .from("materiales_area")
+    .select("id, nombre, area, unidad, stock_actual, stock_minimo, activo, created_at", { count: "exact" })
+    .eq("activo", true)
+    .order("area", { ascending: true })
+    .order("nombre", { ascending: true })
+    .order("id", { ascending: true });
+  if (area) materialsQuery = materialsQuery.eq("area", area);
+
+  const { data, error, count } = await materialsQuery.range(
+    (page - 1) * INVENTORY_PAGE_SIZE,
+    page * INVENTORY_PAGE_SIZE - 1
+  );
+
+  if (error) {
+    console.error("Error cargando inventario de materiales:", error.message);
+    throw new Error(explainDatabaseError(error.message));
+  }
+
+  return {
+    materiales: (data ?? []) as unknown as MaterialArea[],
+    totalMateriales: count ?? 0,
+  };
+}
+
+export async function getInventoryAreasDataAction(
+  requests: Array<{ area: string; page: number }>
+): Promise<Array<InventoryData & { area: string }>> {
+  await requireActor();
+  if (
+    !Array.isArray(requests) ||
+    requests.length > 10 ||
+    requests.some((request) =>
+      !request ||
+      typeof request.area !== "string" ||
+      !request.area.trim() ||
+      request.area.trim().length > 100 ||
+      !Number.isSafeInteger(request.page) ||
+      request.page < 1
+    )
+  ) {
+    throw new Error("La selección de áreas o páginas no es válida.");
+  }
+
+  const supabase = createServerSupabaseClient();
+  return Promise.all(
+    requests.map(async ({ area, page }) => {
+      const normalizedArea = area.trim();
+      const { data, error, count } = await supabase
+        .from("materiales_area")
+        .select("id, nombre, area, unidad, stock_actual, stock_minimo, activo, created_at", { count: "exact" })
+        .eq("activo", true)
+        .eq("area", normalizedArea)
+        .order("nombre", { ascending: true })
+        .order("id", { ascending: true })
+        .range((page - 1) * INVENTORY_PAGE_SIZE, page * INVENTORY_PAGE_SIZE - 1);
+
+      if (error) {
+        console.error(`Error cargando materiales del área ${normalizedArea}:`, error.message);
+        throw new Error(explainDatabaseError(error.message));
+      }
+
+      return {
+        area: normalizedArea,
+        materiales: (data ?? []) as unknown as MaterialArea[],
+        totalMateriales: count ?? 0,
+      };
+    })
+  );
+}
+
+export async function getInventoryMovementsAction(): Promise<MovimientoMaterial[]> {
+  await requireActor();
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("movimientos_materiales")
+    .select("id, material_id, tipo, cantidad, stock_anterior, stock_nuevo, detalle, registrado_por, created_at, materiales_area(nombre, area, unidad), compras_materiales(proveedor, referencia, cantidad_solicitada, cantidad_recibida, costo_unitario)")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error) {
+    console.error("Error cargando movimientos de materiales:", error.message);
+    throw new Error(explainDatabaseError(error.message));
+  }
+
+  return (data ?? []) as unknown as MovimientoMaterial[];
+}
+
+export async function getInventoryAlertsAction(): Promise<AlertaMaterial[]> {
+  await requireActor();
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("alertas_materiales")
+    .select("id, material_id, stock_actual, stock_minimo, estado, destinatario, error, enviado_at, created_at, materiales_area(nombre, area, unidad)")
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error("Error cargando alertas de inventario:", error.message);
+    throw new Error(explainDatabaseError(error.message));
+  }
+
+  return (data ?? []) as unknown as AlertaMaterial[];
+}
+
+export async function getInventoryAreaMaterialsForExportAction(area?: string): Promise<MaterialArea[]> {
+  await requireActor(2);
+  if (area !== undefined && typeof area !== "string") {
+    throw new Error("El área seleccionada no es válida.");
+  }
+  const normalizedArea = area?.trim();
+  if (normalizedArea && normalizedArea.length > 100) {
+    throw new Error("El área seleccionada no es válida.");
+  }
+
+  const supabase = createServerSupabaseClient();
+  const pageSize = 500;
+  const materials: MaterialArea[] = [];
+  let offset = 0;
+
+  while (true) {
+    let query = supabase
       .from("materiales_area")
       .select("id, nombre, area, unidad, stock_actual, stock_minimo, activo, created_at")
       .eq("activo", true)
       .order("area", { ascending: true })
-      .order("nombre", { ascending: true }),
-    supabase
-      .from("movimientos_materiales")
-      .select("id, material_id, tipo, cantidad, stock_anterior, stock_nuevo, detalle, registrado_por, created_at, materiales_area(nombre, area, unidad), compras_materiales(proveedor, referencia, cantidad_solicitada, cantidad_recibida, costo_unitario)")
-      .order("created_at", { ascending: false })
-      .limit(100),
-    supabase
-      .from("alertas_materiales")
-      .select("id, material_id, stock_actual, stock_minimo, estado, destinatario, error, enviado_at, created_at, materiales_area(nombre, area, unidad)")
-      .order("created_at", { ascending: false })
-      .limit(50),
-  ]);
+      .order("nombre", { ascending: true })
+      .order("id", { ascending: true });
+    if (normalizedArea) query = query.eq("area", normalizedArea);
 
-  const failed = [materialsResult, movementsResult, alertsResult].find((result) => result.error);
-  if (failed?.error) {
-    console.error("Error cargando inventario de materiales:", failed.error.message);
-    throw new Error(explainDatabaseError(failed.error.message));
+    const { data, error } = await query.range(offset, offset + pageSize - 1);
+    if (error) {
+      console.error("Error cargando materiales para exportación:", error.message);
+      throw new Error(explainDatabaseError(error.message));
+    }
+
+    const page = (data ?? []) as unknown as MaterialArea[];
+    materials.push(...page);
+    if (page.length < pageSize) break;
+    offset += pageSize;
   }
 
-  return {
-    materiales: (materialsResult.data ?? []) as unknown as MaterialArea[],
-    movimientos: (movementsResult.data ?? []) as unknown as MovimientoMaterial[],
-    alertas: (alertsResult.data ?? []) as unknown as AlertaMaterial[],
-  };
+  return materials;
 }
 
-export async function getConsumptionMaterialsAction(): Promise<MaterialConsumo[]> {
+export async function getConsumptionMaterialsAction(options: {
+  search?: string;
+  area?: string;
+} = {}): Promise<MaterialConsumo[]> {
   await requireActor(4);
+  if (!options || typeof options !== "object") {
+    throw new Error("Los filtros de búsqueda no son válidos.");
+  }
   const supabase = createServerSupabaseClient();
-  const { data, error } = await supabase
+  if (
+    (options.search !== undefined && typeof options.search !== "string") ||
+    (options.area !== undefined && typeof options.area !== "string")
+  ) {
+    throw new Error("Los filtros de búsqueda no son válidos.");
+  }
+  const search = options.search?.trim();
+  const area = options.area?.trim();
+  if (search && search.length > 80) {
+    throw new Error("La búsqueda no puede exceder 80 caracteres.");
+  }
+  if (area && area.length > 100) {
+    throw new Error("El área seleccionada no es válida.");
+  }
+
+  let query = supabase
     .from("materiales_area")
     .select("id, nombre, area, unidad")
     .eq("activo", true)
     .order("area", { ascending: true })
-    .order("nombre", { ascending: true });
+    .order("nombre", { ascending: true })
+    .limit(INVENTORY_PAGE_SIZE);
+  if (area) query = query.eq("area", area);
+  if (search) query = query.ilike("nombre", `%${search}%`);
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("Error cargando materiales para registrar consumo:", error.message);
@@ -189,6 +354,24 @@ export async function getConsumptionMaterialsAction(): Promise<MaterialConsumo[]
   }
 
   return data ?? [];
+}
+
+export async function getConsumptionHistoryAction(): Promise<RegistroConsumoMaterial[]> {
+  await requireActor(4);
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("movimientos_materiales")
+    .select("id, material_id, cantidad, detalle, registrado_por, created_at, materiales_area(nombre, area, unidad)")
+    .eq("tipo", "consumo")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error) {
+    console.error("Error cargando el historial de consumos:", error.message);
+    throw new Error(explainDatabaseError(error.message));
+  }
+
+  return (data ?? []) as unknown as RegistroConsumoMaterial[];
 }
 
 export async function createMaterialAreaAction(input: {

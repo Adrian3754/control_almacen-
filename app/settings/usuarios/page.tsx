@@ -895,6 +895,7 @@ export default function UsuariosPage() {
                   >
                     <option value={2}>Nivel 2 · Encargado</option>
                     <option value={3}>Nivel 3 · Operador</option>
+                    <option value={4}>Nivel 4 · Registro de consumo</option>
                   </select>
                 </FormField>
                 <FormField label="Rol asignado">
@@ -1001,7 +1002,6 @@ export default function UsuariosPage() {
                   <option value={1}>Nivel 1 · Dirección</option>
                   <option value={2}>Nivel 2 · Gerencia</option>
                   <option value={3}>Nivel 3 · Operación</option>
-                  <option value={4}>Nivel 4 · Personal</option>
                 </select>
               </FormField>
             </div>
@@ -1099,6 +1099,7 @@ export default function UsuariosPage() {
                   <option value={1}>Nivel 1 · Dirección</option>
                   <option value={2}>Nivel 2 · Gerencia</option>
                   <option value={3}>Nivel 3 · Operación</option>
+                  <option value={4}>Nivel 4 · Registro de consumo</option>
                 </select>
               </FormField>
               <FormField label="Rol del sistema">

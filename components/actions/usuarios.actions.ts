@@ -1,9 +1,11 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import {
   createAuthAdminSupabaseClient,
   createServerSupabaseClient,
 } from "@/lib/supabase";
+import { getServerEmployeeSession } from "@/lib/serverEmployeeSession";
 import { revalidatePath } from "next/cache";
 
 export type Perfil = {
@@ -57,11 +59,55 @@ function requiredField(value: string, label: string, maxLength: number) {
   return normalized;
 }
 
+async function requireAdministrator() {
+  const session = await getServerEmployeeSession();
+  if (!session) {
+    throw new Error("Inicia sesión con una cuenta administradora para gestionar usuarios.");
+  }
+
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("perfiles")
+    .select("nivel_jerarquia")
+    .eq("numero_empleado", session.numero_empleado)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error validando permisos de administración de usuarios:", error.message);
+    throw new Error("No se pudieron validar tus permisos para gestionar usuarios.");
+  }
+  if (Number(data?.nivel_jerarquia) !== 1) {
+    throw new Error("Solo una cuenta de nivel 1 puede gestionar usuarios.");
+  }
+
+  return supabase;
+}
+
+async function ensureEmployeeNumberAvailable(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  employeeNumber: string
+) {
+  const { data, error } = await supabase
+    .from("perfiles")
+    .select("id")
+    .eq("numero_empleado", employeeNumber)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error verificando el número de empleado:", error.message);
+    throw new Error("No se pudo verificar si el número de empleado está disponible.");
+  }
+  if (data) {
+    throw new Error("Ya existe un usuario con ese número de empleado.");
+  }
+}
+
 /**
  * Obtener la lista completa de perfiles ordenados por jerarquía
  */
 export async function getUsuariosAction(): Promise<Perfil[]> {
-  const supabase = createServerSupabaseClient();
+  const supabase = await requireAdministrator();
   
   const { data, error } = await supabase
     .from("perfiles")
@@ -77,7 +123,7 @@ export async function getUsuariosAction(): Promise<Perfil[]> {
 }
 
 export async function getDespulpadoresAction(): Promise<Despulpador[]> {
-  const supabase = createServerSupabaseClient();
+  const supabase = await requireAdministrator();
 
   const { data, error } = await supabase
     .from("despulpadores")
@@ -107,16 +153,30 @@ export async function enviarInvitacionAction(datos: {
   telefono: string;
   nivel_jerarquia: number;
 }) {
-  const supabase = createServerSupabaseClient();
-  const token = Math.random().toString(36).substring(2, 15);
+  const supabase = await requireAdministrator();
+  const email = requiredField(datos.email, "El correo electrónico", 254).toLowerCase();
+  const numeroEmpleado = requiredField(datos.numero_empleado, "El número de empleado", 50);
+  const cargo = requiredField(datos.cargo, "El área o puesto", 100);
+  const rolesValidos: Perfil["rol"][] = ["Encargado", "Operador"];
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("Escribe un correo electrónico válido.");
+  }
+  if (!Number.isInteger(datos.nivel_jerarquia) || datos.nivel_jerarquia < 2 || datos.nivel_jerarquia > 4) {
+    throw new Error("Selecciona una jerarquía válida.");
+  }
+  if (!rolesValidos.includes(datos.rol)) {
+    throw new Error("Selecciona un rol válido para la invitación.");
+  }
+  await ensureEmployeeNumberAvailable(supabase, numeroEmpleado);
+  const token = randomUUID();
 
   const { error } = await supabase
     .from("invitaciones")
     .insert([{
-      email: datos.email.trim().toLowerCase(),
+      email,
       rol: datos.rol,
-      numero_empleado: datos.numero_empleado.trim(),
-      cargo: datos.cargo.trim(),
+      numero_empleado: numeroEmpleado,
+      cargo,
       telefono: datos.telefono.trim(),
       nivel_jerarquia: Number(datos.nivel_jerarquia),
       token
@@ -142,19 +202,35 @@ export async function crearAdministradorDirectoAction(datos: {
   telefono: string;
   nivel_jerarquia: number;
 }) {
-  const supabase = createServerSupabaseClient();
+  const supabase = await requireAdministrator();
   const authSupabase = createAuthAdminSupabaseClient();
+  const nombre = requiredField(datos.nombre, "El nombre completo", 150);
+  const numeroEmpleado = requiredField(datos.numero_empleado, "El número de empleado", 50);
+  const email = requiredField(datos.email, "El correo de acceso", 254).toLowerCase();
+  const cargo = requiredField(datos.cargo, "El área o puesto", 100);
+  const telefono = datos.telefono.trim();
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("Escribe un correo electrónico válido.");
+  }
+  if (telefono.length > 40) {
+    throw new Error("El teléfono no puede exceder 40 caracteres.");
+  }
+  if (Number(datos.nivel_jerarquia) !== 1) {
+    throw new Error("La cuenta de administrador debe tener jerarquía 1.");
+  }
+  await ensureEmployeeNumberAvailable(supabase, numeroEmpleado);
 
   // 1. Usar la API de administración (auth.admin) para saltar la validación por correo
   const { data: authData, error: authError } = await authSupabase.auth.admin.createUser({
-    email: datos.email.trim().toLowerCase(),
+    email,
     password: "PasswordTemporal2026*", // Contraseña inicial obligatoria
     email_confirm: true, // Activa la cuenta inmediatamente sin enviar correos
     user_metadata: {
-      nombre: datos.nombre.trim(),
-      numero_empleado: datos.numero_empleado.trim(),
-      cargo: datos.cargo.trim(),
-      telefono: datos.telefono.trim(),
+      nombre,
+      numero_empleado: numeroEmpleado,
+      cargo,
+      telefono,
       nivel_jerarquia: Number(datos.nivel_jerarquia),
       rol: "Administrador"
     }
@@ -163,6 +239,9 @@ export async function crearAdministradorDirectoAction(datos: {
   if (authError) {
     const authMessage = getErrorMessage(authError);
     console.error("❌ Error en Supabase Auth al crear administrador:", authMessage, authError);
+    if (authMessage.toLowerCase().includes("already registered") || authMessage.toLowerCase().includes("already been registered")) {
+      throw new Error("Ya existe una cuenta con ese correo electrónico.");
+    }
     throw new Error(`Error de autenticación: ${authMessage}`);
   }
 
@@ -175,10 +254,10 @@ export async function crearAdministradorDirectoAction(datos: {
     .from("perfiles")
     .insert([{
       id: authData.user.id, // Vincula con el ID del Auth recién creado
-      nombre: datos.nombre.trim(),
-      numero_empleado: datos.numero_empleado.trim(),
-      cargo: datos.cargo.trim(),
-      telefono: datos.telefono.trim(),
+      nombre,
+      numero_empleado: numeroEmpleado,
+      cargo,
+      telefono,
       nivel_jerarquia: Number(datos.nivel_jerarquia),
       rol: "Administrador"
     }]);
@@ -186,7 +265,13 @@ export async function crearAdministradorDirectoAction(datos: {
   if (perfilError) {
     console.error("❌ Error al insertar datos en la tabla perfiles:", perfilError.message);
     // Si falla el perfil, eliminamos el usuario de auth para evitar cuentas fantasma
-    await authSupabase.auth.admin.deleteUser(authData.user.id);
+    const { error: cleanupError } = await authSupabase.auth.admin.deleteUser(authData.user.id);
+    if (cleanupError) {
+      console.error("No se pudo eliminar la cuenta de autenticación incompleta:", cleanupError.message);
+    }
+    if (perfilError.code === "23505") {
+      throw new Error("Ya existe un usuario con ese número de empleado o correo.");
+    }
     throw new Error(`Se canceló el alta: El usuario se creó en Auth pero falló el registro en la base de datos de perfiles: ${perfilError.message}`);
   }
 
@@ -221,16 +306,17 @@ export async function crearUsuarioDirectoAction(datos: {
   if (telefono.length > 40) {
     throw new Error("El teléfono no puede exceder 40 caracteres.");
   }
-  if (!Number.isInteger(nivelJerarquia) || nivelJerarquia < 1 || nivelJerarquia > 3) {
+  if (!Number.isInteger(nivelJerarquia) || nivelJerarquia < 1 || nivelJerarquia > 4) {
     throw new Error("Selecciona una jerarquía válida.");
   }
   if (!rolesValidos.includes(datos.rol)) {
     throw new Error("Selecciona un rol válido.");
   }
 
-  const supabase = createServerSupabaseClient();
+  const supabase = await requireAdministrator();
   const authSupabase = createAuthAdminSupabaseClient();
 
+  await ensureEmployeeNumberAvailable(supabase, numeroEmpleado);
   const password = "PasswordTemporal2026*";
 
   const { data: authData, error: authError } = await authSupabase.auth.admin.createUser({
@@ -250,6 +336,9 @@ export async function crearUsuarioDirectoAction(datos: {
   if (authError) {
     const authMessage = getErrorMessage(authError);
     console.error("❌ Error en Supabase Auth al crear usuario:", authMessage, authError);
+    if (authMessage.toLowerCase().includes("already registered") || authMessage.toLowerCase().includes("already been registered")) {
+      throw new Error("Ya existe una cuenta con ese correo electrónico.");
+    }
     throw new Error(`Error de autenticación: ${authMessage}`);
   }
 
@@ -273,6 +362,9 @@ export async function crearUsuarioDirectoAction(datos: {
     if (cleanupError) {
       console.error("❌ No se pudo eliminar la cuenta de Auth después del error de perfil:", cleanupError.message);
     }
+    if (perfilError.code === "23505") {
+      throw new Error("Ya existe un usuario con ese número de empleado o correo.");
+    }
     throw new Error(`Se canceló el alta: fallo al insertar en perfiles: ${perfilError.message}`);
   }
 
@@ -294,7 +386,7 @@ export async function actualizarJerarquiaAction(
   }
 ) {
   const nombre = requiredField(datos.nombre, "El nombre completo", 150);
-  const supabase = createServerSupabaseClient();
+  const supabase = await requireAdministrator();
 
   const { error } = await supabase
     .from("perfiles")

@@ -3,19 +3,27 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   createMaterialAreaAction,
+  getConsumptionHistoryAction,
   getConsumptionMaterialsAction,
-  getInventoryDataAction,
+  getInventoryAreasDataAction,
+  getInventoryAlertsAction,
+  getInventoryAreaMaterialsForExportAction,
+  getInventoryMovementsAction,
   registerMaterialMovementAction,
   retryMaterialAlertAction,
   type AlertaMaterial,
   type MaterialArea,
   type MaterialConsumo,
+  type RegistroConsumoMaterial,
   type MovimientoMaterial,
 } from "@/components/actions/inventario-materiales.actions";
 import { getEmployeeSession, type EmployeeSession } from "@/lib/employeeSession";
 
 type Dialog = "material" | "compra" | "consumo" | null;
 type Feedback = { kind: "success" | "error" | "warning"; text: string } | null;
+type InventoryModule = "existencias" | "consumos" | "alertas" | "movimientos";
+
+const inventoryPageSize = 50;
 
 const fieldClass =
   "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10";
@@ -40,9 +48,50 @@ const inventoryAreas = [
   { name: "Limpieza y sanitización", id: "limpieza-y-sanitizacion", icon: "🧹", description: "Limpieza de las instalaciones", color: "bg-violet-50 text-violet-800 ring-violet-200" },
 ] as const;
 
-function normalizeArea(area: string) {
-  return area.trim().toLocaleLowerCase("es-MX");
-}
+const inventoryModules: Array<{
+  id: InventoryModule;
+  title: string;
+  description: string;
+  icon: string;
+  color: string;
+}> = [
+  {
+    id: "existencias",
+    title: "Inventario por área",
+    description: "Consulta materiales y existencias",
+    icon: "📦",
+    color: "emerald",
+  },
+  {
+    id: "consumos",
+    title: "Registro de consumos",
+    description: "Revisa materiales utilizados",
+    icon: "📋",
+    color: "violet",
+  },
+  {
+    id: "alertas",
+    title: "Alertas de compra",
+    description: "Atiende avisos de reabastecimiento",
+    icon: "🔔",
+    color: "amber",
+  },
+  {
+    id: "movimientos",
+    title: "Movimientos",
+    description: "Entradas, salidas y ajustes recientes",
+    icon: "🔄",
+    color: "sky",
+  },
+];
+
+const consumptionColors = [
+  "border-violet-200 bg-violet-50 text-violet-900",
+  "border-sky-200 bg-sky-50 text-sky-900",
+  "border-amber-200 bg-amber-50 text-amber-900",
+  "border-rose-200 bg-rose-50 text-rose-900",
+  "border-teal-200 bg-teal-50 text-teal-900",
+];
 
 function formatQuantity(value: number) {
   return new Intl.NumberFormat("es-MX", { maximumFractionDigits: 3 }).format(value);
@@ -58,6 +107,62 @@ function formatCurrency(value: number) {
 
 function lowStock(material: MaterialArea) {
   return material.stock_minimo > 0 && material.stock_actual <= material.stock_minimo;
+}
+
+async function exportAreaToExcel(areaName: string, materials: MaterialArea[]) {
+  const ExcelJS = await import("exceljs");
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("Existencias");
+  worksheet.columns = [
+    { header: "Material", key: "material", width: 32 },
+    { header: "Área", key: "area", width: 28 },
+    { header: "Existencia", key: "existencia", width: 14 },
+    { header: "Unidad", key: "unidad", width: 16 },
+    { header: "Existencia mínima", key: "minimo", width: 20 },
+    { header: "Estado", key: "estado", width: 20 },
+  ];
+  worksheet.addRows(
+    materials.map((material) => ({
+      material: material.nombre,
+      area: material.area,
+      existencia: material.stock_actual,
+      unidad: material.unidad,
+      minimo: material.stock_minimo,
+      estado: lowStock(material) ? "Por reabastecer" : "Disponible",
+    }))
+  );
+  worksheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+  worksheet.getRow(1).fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FF065F46" },
+  };
+  worksheet.autoFilter = {
+    from: "A1",
+    to: `F${Math.max(materials.length + 1, 2)}`,
+  };
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([new Uint8Array(buffer)], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `existencias-${areaName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase()}-${[
+      new Date().getFullYear(),
+      String(new Date().getMonth() + 1).padStart(2, "0"),
+      String(new Date().getDate()).padStart(2, "0"),
+    ].join("-")}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function Section({
@@ -148,27 +253,100 @@ function FeedbackBanner({ feedback }: { feedback: Feedback }) {
 }
 
 function MaterialSelect({
-  materials,
   value,
   onChange,
+  area,
   disabled = false,
 }: {
-  materials: MaterialConsumo[];
   value: string;
   onChange: (value: string) => void;
+  area?: string;
   disabled?: boolean;
 }) {
+  const [search, setSearch] = useState("");
+  const [materials, setMaterials] = useState<MaterialConsumo[]>([]);
+  const [selectedMaterial, setSelectedMaterial] = useState<MaterialConsumo | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (disabled) return;
+
+    let active = true;
+    const timeout = window.setTimeout(() => {
+      setLoading(true);
+      getConsumptionMaterialsAction({ search, area })
+        .then((results) => {
+          if (!active) return;
+          setMaterials(results);
+          setError("");
+        })
+        .catch((loadError: unknown) => {
+          if (!active) return;
+          setError(loadError instanceof Error ? loadError.message : "No se pudieron buscar los materiales.");
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    }, 250);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [area, disabled, search]);
+
+  const visibleMaterials = selectedMaterial && !materials.some((material) => material.id === selectedMaterial.id)
+    ? [selectedMaterial, ...materials]
+    : materials;
+
   return (
     <label className="block text-sm font-medium text-slate-700">
       Material y área
-      <select required disabled={disabled} value={value} onChange={(event) => onChange(event.target.value)} className={fieldClass}>
-        <option value="">{disabled ? "Primero selecciona un área" : "Selecciona un material"}</option>
-        {materials.map((material) => (
+      <input
+        type="search"
+        value={search}
+        onChange={(event) => {
+          setLoading(true);
+          setError("");
+          setSearch(event.target.value);
+        }}
+        disabled={disabled}
+        className={fieldClass}
+        placeholder={area ? `Buscar en ${area}` : "Buscar material por nombre"}
+        aria-label="Buscar material"
+      />
+      <select
+        required
+        disabled={disabled || loading || visibleMaterials.length === 0}
+        value={value}
+        onChange={(event) => {
+          const selected = visibleMaterials.find((material) => material.id === event.target.value) ?? null;
+          setSelectedMaterial(selected);
+          onChange(event.target.value);
+        }}
+        className={fieldClass}
+      >
+        <option value="">
+          {disabled ? "Primero selecciona un área" : loading ? "Buscando materiales..." : "Selecciona un material"}
+        </option>
+        {visibleMaterials.map((material) => (
           <option key={material.id} value={material.id}>
             {material.nombre} · {material.area} ({material.unidad})
           </option>
         ))}
       </select>
+      {error ? <span role="alert" className="mt-1 block text-xs text-rose-700">{error}</span> : null}
+      {!disabled && !loading && !error && visibleMaterials.length === 0 ? (
+        <span className="mt-1 block text-xs text-amber-800">
+          {search ? "No hay materiales que coincidan con la búsqueda." : "No hay materiales activos para seleccionar."}
+        </span>
+      ) : null}
+      {!disabled && !loading && materials.length === 50 ? (
+        <span className="mt-1 block text-xs text-slate-500">
+          Se muestran hasta 50 resultados. Escribe un nombre más específico si no aparece el material.
+        </span>
+      ) : null}
     </label>
   );
 }
@@ -285,6 +463,79 @@ function MovementsList({ movements }: { movements: MovimientoMaterial[] }) {
   );
 }
 
+function ConsumptionSummary({ records }: { records: RegistroConsumoMaterial[] }) {
+  const summaries = useMemo(() => {
+    const byMaterial = new Map<
+      string,
+      {
+        id: string;
+        nombre: string;
+        area: string;
+        unidad: string;
+        cantidad: number;
+        registros: number;
+        ultimaActividad: string;
+      }
+    >();
+
+    for (const record of records) {
+      const current = byMaterial.get(record.material_id);
+      if (current) {
+        current.cantidad += record.cantidad;
+        current.registros += 1;
+      } else {
+        byMaterial.set(record.material_id, {
+          id: record.material_id,
+          nombre: record.materiales_area.nombre,
+          area: record.materiales_area.area,
+          unidad: record.materiales_area.unidad,
+          cantidad: record.cantidad,
+          registros: 1,
+          ultimaActividad: record.created_at,
+        });
+      }
+    }
+
+    return [...byMaterial.values()].sort(
+      (first, second) => second.cantidad - first.cantidad
+    );
+  }, [records]);
+
+  if (records.length === 0) {
+    return (
+      <p className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+        Todavía no hay consumos registrados.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {summaries.map((summary, index) => (
+        <article
+          key={summary.id}
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-4 ${consumptionColors[index % consumptionColors.length]}`}
+        >
+          <div className="min-w-0">
+            <p className="font-bold">{summary.nombre}</p>
+            <p className="mt-1 text-sm opacity-80">{summary.area}</p>
+            <p className="mt-1 text-xs opacity-70">
+              {summary.registros} registro{summary.registros === 1 ? "" : "s"} · Último:{" "}
+              {new Date(summary.ultimaActividad).toLocaleString("es-MX")}
+            </p>
+          </div>
+          <div className="rounded-xl bg-white/80 px-4 py-2 text-right shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide opacity-70">Total consumido</p>
+            <p className="text-lg font-extrabold">
+              {formatQuantity(summary.cantidad)} {summary.unidad}
+            </p>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function AlertsList({
   alerts,
   canRetry,
@@ -357,19 +608,30 @@ function AlertsList({
 export default function InventarioPage() {
   const [session, setSession] = useState<EmployeeSession | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
-  const [data, setData] = useState<{
+  const [areaData, setAreaData] = useState<Record<string, {
     materiales: MaterialArea[];
-    movimientos: MovimientoMaterial[];
-    alertas: AlertaMaterial[];
-  } | null>(null);
-  const [consumptionMaterials, setConsumptionMaterials] = useState<MaterialConsumo[]>([]);
+    totalMateriales: number;
+  }>>({});
+  const [movements, setMovements] = useState<MovimientoMaterial[]>([]);
+  const [movementsLoading, setMovementsLoading] = useState(true);
+  const [alerts, setAlerts] = useState<AlertaMaterial[]>([]);
+  const [alertsLoading, setAlertsLoading] = useState(true);
+  const [consumptionHistory, setConsumptionHistory] = useState<RegistroConsumoMaterial[]>([]);
+  const [consumptionHistoryLoading, setConsumptionHistoryLoading] = useState(true);
+  const [consumptionHistoryError, setConsumptionHistoryError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [materialsLoading, setMaterialsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [alertsError, setAlertsError] = useState("");
+  const [movementsError, setMovementsError] = useState("");
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [retryingAlert, setRetryingAlert] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
+  const [adminModule, setAdminModule] = useState<InventoryModule>("existencias");
+  const [areaPages, setAreaPages] = useState<Record<string, number>>({});
   const [materialForm, setMaterialForm] = useState({
     nombre: "",
     area: "",
@@ -396,8 +658,8 @@ export default function InventarioPage() {
   const canManage = Number(session?.nivel_jerarquia ?? 3) <= 2;
   const isConsumptionOnly = Number(session?.nivel_jerarquia) === 4;
   const lowMaterials = useMemo(
-    () => (data?.materiales ?? []).filter(lowStock),
-    [data?.materiales]
+    () => Object.values(areaData).flatMap((area) => area.materiales).filter(lowStock),
+    [areaData]
   );
 
   useEffect(() => {
@@ -407,9 +669,11 @@ export default function InventarioPage() {
       const currentSession = getEmployeeSession();
       setSession(currentSession);
       setSessionReady(true);
+      if (!currentSession || Number(currentSession.nivel_jerarquia) === 4) {
+        setLoading(false);
+      }
       if (!currentSession) {
         setLoadError("Inicia sesión para consultar el inventario de materiales.");
-        setLoading(false);
       }
     });
     return () => {
@@ -419,19 +683,21 @@ export default function InventarioPage() {
 
   useEffect(() => {
     if (!sessionReady || !session) return;
+    const shouldLoadInventory = !isConsumptionOnly && (!canManage || adminModule === "existencias");
+    if (!shouldLoadInventory) return;
+
     let active = true;
-    const inventoryRequest = isConsumptionOnly
-      ? getConsumptionMaterialsAction().then((materials) => {
-          if (active) setConsumptionMaterials(materials);
-        })
-      : getInventoryDataAction().then((inventory) => {
-          if (active) setData(inventory);
-        });
-    inventoryRequest
-      .then(() => {
-        if (active) {
-          setLoadError("");
-        }
+    getInventoryAreasDataAction(inventoryAreas.map((area) => ({
+      area: area.name,
+      page: areaPages[area.name] ?? 1,
+    })))
+      .then((results) => {
+        if (!active) return;
+        setAreaData(Object.fromEntries(results.map((result) => [result.area, {
+          materiales: result.materiales,
+          totalMateriales: result.totalMateriales,
+        }])));
+        setLoadError("");
       })
       .catch((error: unknown) => {
         if (active) {
@@ -439,14 +705,119 @@ export default function InventarioPage() {
         }
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) {
+          setLoading(false);
+          setMaterialsLoading(false);
+        }
       });
     return () => {
       active = false;
     };
-  }, [isConsumptionOnly, session, sessionReady, refreshVersion]);
+  }, [adminModule, areaPages, canManage, isConsumptionOnly, refreshVersion, session, sessionReady]);
 
-  const updateData = () => setRefreshVersion((version) => version + 1);
+  useEffect(() => {
+    if (!sessionReady || !session || isConsumptionOnly) return;
+    const shouldLoadActivity = !canManage || adminModule === "movimientos";
+    if (!shouldLoadActivity) return;
+
+    let active = true;
+    getInventoryMovementsAction()
+      .then((records) => {
+        if (!active) return;
+        setMovements(records);
+        setMovementsError("");
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setMovementsError(error instanceof Error ? error.message : "No se pudieron cargar los movimientos.");
+        }
+      })
+      .finally(() => {
+        if (active) setMovementsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [adminModule, canManage, isConsumptionOnly, refreshVersion, session, sessionReady]);
+
+  useEffect(() => {
+    if (!sessionReady || !session || isConsumptionOnly) return;
+    const shouldLoadActivity = !canManage || adminModule === "alertas";
+    if (!shouldLoadActivity) return;
+
+    let active = true;
+    getInventoryAlertsAction()
+      .then((records) => {
+        if (!active) return;
+        setAlerts(records);
+        setAlertsError("");
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setAlertsError(error instanceof Error ? error.message : "No se pudieron cargar las alertas.");
+        }
+      })
+      .finally(() => {
+        if (active) setAlertsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [adminModule, canManage, isConsumptionOnly, refreshVersion, session, sessionReady]);
+
+  useEffect(() => {
+    if (!sessionReady || !session || (!isConsumptionOnly && canManage && adminModule !== "consumos")) return;
+    let active = true;
+
+    getConsumptionHistoryAction()
+      .then((records) => {
+        if (!active) return;
+        setConsumptionHistory(records);
+        setConsumptionHistoryError("");
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setConsumptionHistoryError(
+          error instanceof Error ? error.message : "No se pudo cargar el historial de consumos."
+        );
+      })
+      .finally(() => {
+        if (active) setConsumptionHistoryLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [adminModule, canManage, isConsumptionOnly, refreshVersion, session, sessionReady]);
+
+  const updateData = () => {
+    if (!canManage || adminModule === "existencias") setMaterialsLoading(true);
+    if (isConsumptionOnly || !canManage || adminModule === "consumos") setConsumptionHistoryLoading(true);
+    if (!canManage || adminModule === "alertas") setAlertsLoading(true);
+    if (!canManage || adminModule === "movimientos") setMovementsLoading(true);
+    setRefreshVersion((version) => version + 1);
+  };
+
+  async function handleExportArea(areaName: string) {
+    setFeedback(null);
+    setExporting(true);
+    try {
+      const area = areaName === "Todas las áreas" ? undefined : areaName;
+      const exportMaterials = await getInventoryAreaMaterialsForExportAction(area);
+      await exportAreaToExcel(areaName, exportMaterials);
+      setFeedback({
+        kind: "success",
+        text: `Se exportaron ${exportMaterials.length} materiales${area ? ` de ${area}` : ""} a Excel.`,
+      });
+    } catch (error: unknown) {
+      setFeedback({
+        kind: "error",
+        text: error instanceof Error ? error.message : `No se pudieron exportar las existencias de ${areaName}.`,
+      });
+    } finally {
+      setExporting(false);
+    }
+  }
 
   function openDialog(nextDialog: Exclude<Dialog, null>) {
     setFeedback(null);
@@ -590,20 +961,15 @@ export default function InventarioPage() {
     }
   }
 
-  const materials = data?.materiales ?? [];
-  const movements = data?.movimientos ?? [];
-  const alerts = data?.alertas ?? [];
-  const totalMaterials = materials.length;
-  const materialsLow = lowMaterials.length;
-  const areaCount = new Set(materials.map((material) => material.area)).size;
-  const knownAreaNames = new Set(inventoryAreas.map((area) => normalizeArea(area.name)));
-  const purchaseMaterials = purchaseForm.area
-    ? materials.filter((material) => normalizeArea(material.area) === normalizeArea(purchaseForm.area))
-    : [];
-  const materialsByOtherArea = materials.filter(
-    (material) => !knownAreaNames.has(normalizeArea(material.area))
+  const totalMaterials = inventoryAreas.reduce(
+    (total, area) => total + (areaData[area.name]?.totalMateriales ?? 0),
+    0
   );
-  const otherAreaNames = [...new Set(materialsByOtherArea.map((material) => material.area))];
+  const materialsLow = lowMaterials.length;
+  const showInventoryModule = !canManage || adminModule === "existencias";
+  const showConsumptionModule = !canManage || adminModule === "consumos";
+  const showAlertsModule = !canManage || adminModule === "alertas";
+  const showMovementsModule = !canManage || adminModule === "movimientos";
 
   if (!sessionReady || loading) {
     return (
@@ -633,17 +999,10 @@ export default function InventarioPage() {
             </div>
           ) : null}
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-            {consumptionMaterials.length === 0 && !loadError ? (
-              <p className="mb-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                No hay materiales activos para registrar. Comunícate con tu supervisor.
-              </p>
-            ) : null}
             <form onSubmit={handleRegisterConsumption} className="space-y-4">
               <MaterialSelect
-                materials={consumptionMaterials}
                 value={consumptionForm.material_id}
                 onChange={(value) => setConsumptionForm({ ...consumptionForm, material_id: value })}
-                disabled={consumptionMaterials.length === 0}
               />
               <label className="block text-sm font-medium text-slate-700">
                 Cantidad consumida
@@ -653,11 +1012,27 @@ export default function InventarioPage() {
                 Nota (opcional)
                 <input maxLength={500} value={consumptionForm.detalle} onChange={(event) => setConsumptionForm({ ...consumptionForm, detalle: event.target.value })} className={fieldClass} />
               </label>
-              <button type="submit" disabled={busy || consumptionMaterials.length === 0} className={primaryButtonClass}>
+              <button type="submit" disabled={busy} className={primaryButtonClass}>
                 {busy ? "Registrando..." : "Guardar consumo"}
               </button>
             </form>
           </section>
+          <Section
+            title="Consumos registrados"
+            description="Materiales y cantidades acumuladas de los últimos 100 registros."
+          >
+            {consumptionHistoryError ? (
+              <p role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                {consumptionHistoryError}
+              </p>
+            ) : consumptionHistoryLoading ? (
+              <p className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                Cargando consumos...
+              </p>
+            ) : (
+              <ConsumptionSummary records={consumptionHistory} />
+            )}
+          </Section>
         </div>
       </main>
     );
@@ -681,30 +1056,87 @@ export default function InventarioPage() {
               </button>
             ) : null}
             {canManage ? (
-              <button type="button" onClick={() => openDialog("compra")} disabled={materials.length === 0} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50">
+              <button type="button" onClick={() => openDialog("compra")} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50">
                 Registrar compra
               </button>
             ) : null}
-            <button type="button" onClick={() => openDialog("consumo")} disabled={materials.length === 0} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="button" onClick={() => openDialog("consumo")} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
               Registrar consumo
             </button>
           </div>
         </header>
 
         <FeedbackBanner feedback={feedback} />
-        {loadError ? (
+        {canManage ? (
+          <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <div className="mb-4">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">Espacio administrativo</p>
+              <h2 className="mt-1 text-lg font-bold text-slate-900">¿Qué deseas consultar?</h2>
+            </div>
+            <nav aria-label="Módulos de Compras e inventario" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {inventoryModules.map((module) => {
+                const isActive = adminModule === module.id;
+                const isInventory = module.id === "existencias";
+                const count = module.id === "consumos"
+                  ? consumptionHistory.length
+                  : module.id === "alertas"
+                    ? alerts.length
+                    : module.id === "movimientos"
+                      ? movements.length
+                      : totalMaterials;
+                const activeStyles = {
+                  emerald: "border-emerald-300 bg-emerald-50 ring-2 ring-emerald-100",
+                  violet: "border-violet-300 bg-violet-50 ring-2 ring-violet-100",
+                  amber: "border-amber-300 bg-amber-50 ring-2 ring-amber-100",
+                  sky: "border-sky-300 bg-sky-50 ring-2 ring-sky-100",
+                }[module.color];
+                return (
+                  <button
+                    key={module.id}
+                    type="button"
+                    onClick={() => {
+                      setAdminModule(module.id);
+                      if (module.id === "consumos") setConsumptionHistoryLoading(true);
+                      if (isInventory) setMaterialsLoading(true);
+                      if (module.id === "alertas") setAlertsLoading(true);
+                      if (module.id === "movimientos") setMovementsLoading(true);
+                      setAlertsError("");
+                      setMovementsError("");
+                      setLoadError("");
+                    }}
+                    aria-current={isActive ? "page" : undefined}
+                    className={`group flex min-h-24 items-center gap-3 rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
+                      isActive ? activeStyles : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
+                  >
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm">
+                      {module.icon}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-bold text-slate-900">{module.title}</span>
+                      <span className="mt-1 block text-xs leading-5 text-slate-500">{module.description}</span>
+                    </span>
+                    <span className="shrink-0 rounded-full bg-white/80 px-2.5 py-1 text-xs font-bold text-slate-600">
+                      {isActive ? "Abierto" : count}
+                    </span>
+                  </button>
+                );
+              })}
+            </nav>
+          </section>
+        ) : null}
+        {showInventoryModule && loadError ? (
           <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
             {loadError}
           </div>
         ) : null}
-
-        {!loadError ? (
+        {showInventoryModule && !loadError ? (
           <>
             <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {[
-                { label: "Materiales registrados", value: totalMaterials, icon: "📦" },
-                { label: "Materiales por reabastecer", value: materialsLow, icon: "⚠️" },
-                { label: "Áreas registradas", value: areaCount, icon: "📊" },
+                { label: "Materiales activos", value: totalMaterials, icon: "📦" },
+                { label: "Por reabastecer en las páginas visibles", value: materialsLow, icon: "⚠️" },
+                { label: "Áreas de trabajo", value: inventoryAreas.length, icon: "📊" },
               ].map((stat) => (
                 <article key={stat.label} className="flex items-center gap-4 rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm">
                   <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-2xl" aria-hidden="true">{stat.icon}</span>
@@ -718,83 +1150,168 @@ export default function InventarioPage() {
 
             {materialsLow > 0 ? (
               <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                Hay {materialsLow} material{materialsLow === 1 ? "" : "es"} en o por debajo del mínimo. Se generará un correo al cruzar el mínimo configurado.
+                En las páginas visibles hay {materialsLow} material{materialsLow === 1 ? "" : "es"} en o por debajo del mínimo.
               </div>
             ) : null}
 
-            <section className="space-y-5">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">Áreas de compras</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Selecciona un área para consultar sus materiales. Cada tabla muestra existencias y mínimos.
-                </p>
-              </div>
-              <nav aria-label="Áreas de compras" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {inventoryAreas.map((area) => {
-                  const areaMaterials = materials.filter(
-                    (material) => normalizeArea(material.area) === normalizeArea(area.name)
-                  );
-                  return (
-                    <a
-                      key={area.id}
-                      href={`#${area.id}`}
-                      className={`flex items-center gap-3 rounded-2xl px-4 py-3 ring-1 transition hover:-translate-y-0.5 hover:shadow-sm ${area.color}`}
-                    >
-                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/80 text-xl" aria-hidden="true">{area.icon}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-semibold">{area.name}</span>
-                        <span className="mt-0.5 block text-xs opacity-80">{area.description}</span>
-                      </span>
-                      <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-bold">{areaMaterials.length}</span>
-                    </a>
-                  );
-                })}
-              </nav>
+            <nav aria-label="Áreas de inventario" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {inventoryAreas.map((area) => {
+                const areaTotal = areaData[area.name]?.totalMateriales ?? 0;
+                return (
+                  <a
+                    key={area.id}
+                    href={`#${area.id}`}
+                    className={`flex items-center gap-3 rounded-2xl p-4 ring-1 transition hover:-translate-y-0.5 hover:shadow-md ${area.color}`}
+                  >
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/80 text-2xl shadow-sm" aria-hidden="true">{area.icon}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-bold">{area.name}</span>
+                      <span className="mt-1 block text-xs opacity-80">{area.description}</span>
+                    </span>
+                    <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-bold">{areaTotal}</span>
+                  </a>
+                );
+              })}
+            </nav>
 
-              <div className="space-y-4">
-                {inventoryAreas.map((area) => {
-                  const areaMaterials = materials.filter(
-                    (material) => normalizeArea(material.area) === normalizeArea(area.name)
-                  );
-                  return (
-                    <div key={area.id} id={area.id} className="scroll-mt-6">
-                      <Section
-                        title={`${area.icon} ${area.name}`}
-                        description={area.description}
-                      >
+            <div className="space-y-5">
+              {inventoryAreas.map((area) => {
+                const areaMaterials = areaData[area.name]?.materiales ?? [];
+                const areaTotal = areaData[area.name]?.totalMateriales ?? 0;
+                const page = areaPages[area.name] ?? 1;
+                const lastVisible = Math.min(page * inventoryPageSize, areaTotal);
+                const areaLow = areaMaterials.filter(lowStock).length;
+                return (
+                  <section
+                    key={area.id}
+                    id={area.id}
+                    className="scroll-mt-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+                  >
+                    <header className={`flex flex-wrap items-center justify-between gap-4 border-b px-5 py-4 sm:px-6 ${area.color}`}>
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/80 text-2xl shadow-sm" aria-hidden="true">{area.icon}</span>
+                        <div>
+                          <h2 className="text-lg font-bold">{area.name}</h2>
+                          <p className="mt-0.5 text-sm opacity-80">{area.description}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-white/80 px-3 py-1.5 text-xs font-bold">
+                          {areaTotal} {areaTotal === 1 ? "material" : "materiales"}
+                        </span>
+                        {canManage ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleExportArea(area.name)}
+                            disabled={exporting}
+                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/80 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
+                          >
+                            <span aria-hidden="true">📥</span>
+                            {exporting ? "Preparando..." : "Exportar Excel"}
+                          </button>
+                        ) : null}
+                      </div>
+                    </header>
+                    <div className="p-4 sm:p-6">
+                      {materialsLoading ? (
+                        <p role="status" className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                          Cargando materiales de {area.name}...
+                        </p>
+                      ) : (
                         <MaterialsTable
                           materials={areaMaterials}
                           emptyMessage={`Agrega materiales y asígnalos a ${area.name}.`}
                         />
-                      </Section>
+                      )}
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                        <div className="text-sm text-slate-500">
+                          {areaTotal === 0
+                            ? "Aún no hay materiales en esta área."
+                            : `Mostrando ${((page - 1) * inventoryPageSize) + 1}–${lastVisible} de ${areaTotal} materiales`}
+                          {!materialsLoading && areaLow > 0 ? (
+                            <span className="ml-2 font-semibold text-amber-700">
+                              · {areaLow} por reabastecer en esta página
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMaterialsLoading(true);
+                              setAreaPages((pages) => ({ ...pages, [area.name]: Math.max(1, page - 1) }));
+                            }}
+                            disabled={page <= 1 || materialsLoading}
+                            className="min-h-10 rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Anterior
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMaterialsLoading(true);
+                              setAreaPages((pages) => ({ ...pages, [area.name]: page + 1 }));
+                            }}
+                            disabled={page * inventoryPageSize >= areaTotal || materialsLoading}
+                            className="min-h-10 rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Siguiente
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  );
-                })}
-                {materialsByOtherArea.length > 0 ? (
-                  <Section
-                    title="Otras áreas registradas"
-                    description={`Se conservan aquí materiales anteriores asignados a: ${otherAreaNames.join(", ")}.`}
-                  >
-                    <MaterialsTable materials={materialsByOtherArea} />
-                  </Section>
-                ) : null}
-              </div>
-            </section>
-
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-              <Section title="Alertas para Compras" description="Avisos creados al bajar del mínimo. Los correos fallidos se pueden reintentar.">
-                <AlertsList
-                  alerts={alerts}
-                  canRetry={canManage}
-                  retryingAlert={retryingAlert}
-                  onRetry={handleRetryAlert}
-                />
-              </Section>
-              <Section title="Últimos movimientos" description="Entradas recibidas, consumos y ajustes recientes.">
-                <MovementsList movements={movements} />
-              </Section>
+                  </section>
+                );
+              })}
             </div>
           </>
+        ) : null}
+
+        {showConsumptionModule ? (
+            <Section
+              title="Consumos registrados"
+              description="Cantidades acumuladas por material, agrupadas de los últimos 100 registros de consumo."
+            >
+              {consumptionHistoryError ? (
+                <p role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                  {consumptionHistoryError}
+                </p>
+              ) : consumptionHistoryLoading ? (
+                <p className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                  Cargando consumos...
+                </p>
+              ) : (
+                <ConsumptionSummary records={consumptionHistory} />
+              )}
+            </Section>
+        ) : null}
+
+        {showAlertsModule ? (
+          <Section title="Alertas para Compras" description="Avisos creados al bajar del mínimo. Los correos fallidos se pueden reintentar.">
+            {alertsError ? (
+              <p role="alert" className="mb-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{alertsError}</p>
+            ) : alertsLoading ? (
+              <p role="status" className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">Cargando alertas...</p>
+            ) : null}
+            {!alertsLoading && !alertsError ? (
+              <AlertsList
+                alerts={alerts}
+                canRetry={canManage}
+                retryingAlert={retryingAlert}
+                onRetry={handleRetryAlert}
+              />
+            ) : null}
+          </Section>
+        ) : null}
+        {showMovementsModule ? (
+          <Section title="Últimos movimientos" description="Entradas recibidas, consumos y ajustes recientes.">
+            {movementsError ? (
+              <p role="alert" className="mb-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{movementsError}</p>
+            ) : movementsLoading ? (
+              <p role="status" className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">Cargando movimientos...</p>
+            ) : null}
+            {!movementsLoading && !movementsError ? <MovementsList movements={movements} /> : null}
+          </Section>
         ) : null}
       </div>
 
@@ -867,16 +1384,12 @@ export default function InventarioPage() {
               </select>
             </label>
             <MaterialSelect
-              materials={purchaseMaterials}
+              key={purchaseForm.area}
               value={purchaseForm.material_id}
               onChange={(value) => setPurchaseForm({ ...purchaseForm, material_id: value })}
+              area={purchaseForm.area}
               disabled={!purchaseForm.area}
             />
-            {purchaseForm.area && purchaseMaterials.length === 0 ? (
-              <p className="-mt-2 text-xs text-amber-800">
-                No hay materiales registrados para esta área. Registra primero el material en el inventario.
-              </p>
-            ) : null}
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block text-sm font-medium text-slate-700">
                 Cantidad solicitada
@@ -919,7 +1432,6 @@ export default function InventarioPage() {
         >
           <form onSubmit={handleRegisterConsumption} className="space-y-4">
             <MaterialSelect
-              materials={materials}
               value={consumptionForm.material_id}
               onChange={(value) => setConsumptionForm({ ...consumptionForm, material_id: value })}
             />
