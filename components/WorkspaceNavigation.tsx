@@ -8,6 +8,10 @@ import {
   clearEmployeeSessionAction,
 } from "@/components/actions/auth.actions";
 import {
+  removeInventoryPushSubscriptionAction,
+  saveInventoryPushSubscriptionAction,
+} from "@/components/actions/inventario-materiales.actions";
+import {
   clearEmployeeSession,
   getEmployeeSession,
   type EmployeeSession,
@@ -68,6 +72,42 @@ export default function WorkspaceNavigation({
     };
   }, []);
 
+  useEffect(() => {
+    if (
+      !session ||
+      Number(session.nivel_jerarquia) > 2 ||
+      !("serviceWorker" in navigator) ||
+      !("PushManager" in window)
+    ) {
+      return;
+    }
+
+    let active = true;
+    const refreshPushSession = async () => {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (active && subscription) {
+          await saveInventoryPushSubscriptionAction(subscription.toJSON());
+        }
+      } catch (error: unknown) {
+        if (active) {
+          console.error("No se pudo renovar la suscripción push del administrador:", error);
+        }
+      }
+    };
+
+    void refreshPushSession();
+    const refreshTimer = window.setInterval(() => {
+      void refreshPushSession();
+    }, 60 * 60 * 1000);
+
+    return () => {
+      active = false;
+      window.clearInterval(refreshTimer);
+    };
+  }, [session]);
+
   const isStandalonePage = pathname === "/" || pathname === "/login";
 
   useEffect(() => {
@@ -119,6 +159,18 @@ export default function WorkspaceNavigation({
   const handleLogout = async () => {
     setLogoutError("");
     try {
+      if (
+        Number(session?.nivel_jerarquia) <= 2 &&
+        "serviceWorker" in navigator &&
+        "PushManager" in window
+      ) {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const subscription = await registration?.pushManager.getSubscription();
+        if (subscription) {
+          await removeInventoryPushSubscriptionAction(subscription.endpoint);
+          await subscription.unsubscribe();
+        }
+      }
       await clearEmployeeSessionAction();
       clearEmployeeSession();
       setSession(null);

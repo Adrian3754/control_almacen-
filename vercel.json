@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/compras/reminders",
+      "schedule": "0 15 * * *"
+    }
+  ]
+}

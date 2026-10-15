@@ -7,6 +7,7 @@ const withPWA = withPWAInit({
   disable: process.env.NODE_ENV === "development",
   cacheStartUrl: false,
   dynamicStartUrl: false,
+  customWorkerSrc: "worker",
   workboxOptions: {
     runtimeCaching: [],
   },

@@ -3,6 +3,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { sendLowStockEmail } from "@/lib/inventoryEmail";
 import { getServerEmployeeSession } from "@/lib/serverEmployeeSession";
+import { notifyInventoryAdministrators, type InventoryPushResult } from "@/lib/inventoryPush";
 import { revalidatePath } from "next/cache";
 
 export type MaterialArea = {
@@ -56,6 +57,24 @@ export type AlertaMaterial = {
   materiales_area: Pick<MaterialArea, "nombre" | "area" | "unidad">;
 };
 
+export type RequisicionMaterial = {
+  id: string;
+  departamento_solicitante: string;
+  fecha_solicitud: string;
+  fecha_estimada: string;
+  motivo: string;
+  solicitado_por: string;
+  estado: "pendiente" | "completa" | "cancelada";
+  created_at: string;
+  completada_at: string | null;
+  detalles: Array<{
+    id: string;
+    descripcion: string;
+    cantidad: number;
+    unidad: string;
+  }>;
+};
+
 type InventoryData = {
   materiales: MaterialArea[];
   totalMateriales: number;
@@ -84,6 +103,55 @@ type EmailResult = {
   status: "enviado" | "error";
   message: string;
 };
+
+type PushSubscriptionInput = {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  expirationTime?: number | null;
+};
+
+function isPushSubscriptionInput(value: unknown): value is PushSubscriptionInput {
+  if (typeof value !== "object" || value === null) return false;
+  if (!("endpoint" in value) || typeof value.endpoint !== "string") return false;
+  if (!("keys" in value) || typeof value.keys !== "object" || value.keys === null) return false;
+  const validKeys =
+    "p256dh" in value.keys &&
+    typeof value.keys.p256dh === "string" &&
+    "auth" in value.keys &&
+    typeof value.keys.auth === "string";
+  if (!validKeys) return false;
+  if (
+    "expirationTime" in value &&
+    value.expirationTime !== null &&
+    (typeof value.expirationTime !== "number" ||
+      !Number.isFinite(value.expirationTime) ||
+    value.expirationTime <= Date.now())
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function validatePushEndpoint(endpoint: string) {
+  if (endpoint.length > 2048) {
+    throw new Error("La suscripción de notificaciones no es válida.");
+  }
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    throw new Error("La suscripción de notificaciones no es válida.");
+  }
+  const allowedHost =
+    url.hostname === "fcm.googleapis.com" ||
+    url.hostname === "push.services.mozilla.com" ||
+    url.hostname.endsWith(".push.services.mozilla.com") ||
+    url.hostname === "web.push.apple.com" ||
+    url.hostname.endsWith(".push.apple.com");
+  if (url.protocol !== "https:" || !allowedHost || !url.pathname || url.username || url.password) {
+    throw new Error("El navegador proporcionó una suscripción de notificaciones no compatible.");
+  }
+}
 
 function requireText(value: string, field: string, maxLength: number) {
   const normalized = value.trim();
@@ -192,6 +260,62 @@ export async function getInventoryDataAction(options: {
   };
 }
 
+export async function saveInventoryPushSubscriptionAction(subscription: unknown): Promise<void> {
+  const actor = await requireActor(2);
+  if (!isPushSubscriptionInput(subscription)) {
+    throw new Error("La suscripción de notificaciones no es válida.");
+  }
+  validatePushEndpoint(subscription.endpoint);
+  if (
+    subscription.keys.p256dh.length > 256 ||
+    subscription.keys.auth.length > 256 ||
+    !/^[A-Za-z0-9_-]+$/.test(subscription.keys.p256dh) ||
+    !/^[A-Za-z0-9_-]+$/.test(subscription.keys.auth)
+  ) {
+    throw new Error("Las claves de la suscripción de notificaciones no son válidas.");
+  }
+
+  const supabase = createServerSupabaseClient();
+  const expiresAt = subscription.expirationTime
+    ? new Date(subscription.expirationTime).toISOString()
+    : null;
+  const { error } = await supabase
+    .from("inventory_push_subscriptions")
+    .upsert(
+      {
+        endpoint: subscription.endpoint,
+        employee_number: actor.numero_empleado,
+        p256dh: subscription.keys.p256dh,
+        auth: subscription.keys.auth,
+        expires_at: expiresAt,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "endpoint" }
+    );
+  if (error) {
+    console.error("No se pudo guardar la suscripción push:", error.message);
+    throw new Error("No se pudo activar la notificación en este dispositivo.");
+  }
+}
+
+export async function removeInventoryPushSubscriptionAction(endpoint: string): Promise<void> {
+  const actor = await requireActor(2);
+  if (typeof endpoint !== "string") {
+    throw new Error("La suscripción de notificaciones no es válida.");
+  }
+  validatePushEndpoint(endpoint);
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase
+    .from("inventory_push_subscriptions")
+    .delete()
+    .eq("endpoint", endpoint)
+    .eq("employee_number", actor.numero_empleado);
+  if (error) {
+    console.error("No se pudo desactivar la suscripción push:", error.message);
+    throw new Error("No se pudo desactivar la notificación en este dispositivo.");
+  }
+}
+
 export async function getInventoryAreasDataAction(
   requests: Array<{ area: string; page: number }>
 ): Promise<Array<InventoryData & { area: string }>> {
@@ -270,6 +394,158 @@ export async function getInventoryAlertsAction(): Promise<AlertaMaterial[]> {
   }
 
   return (data ?? []) as unknown as AlertaMaterial[];
+}
+
+export async function getMaterialRequisitionsAction(): Promise<RequisicionMaterial[]> {
+  await requireActor(2);
+  const supabase = createServerSupabaseClient();
+  const requisitionFields =
+    "id, departamento_solicitante, fecha_solicitud, fecha_estimada, motivo, solicitado_por, estado, created_at, completada_at, detalles:requisicion_materiales_detalles(id, descripcion, cantidad, unidad)";
+  const [pendingResult, historyResult] = await Promise.all([
+    supabase
+      .from("requisiciones_materiales")
+      .select(requisitionFields)
+      .eq("estado", "pendiente")
+      .order("fecha_estimada", { ascending: true })
+      .limit(200),
+    supabase
+      .from("requisiciones_materiales")
+      .select(requisitionFields)
+      .neq("estado", "pendiente")
+      .order("created_at", { ascending: false })
+      .limit(50),
+  ]);
+
+  const errorMessage = pendingResult.error?.message ?? historyResult.error?.message;
+  if (errorMessage) {
+    console.error("Error cargando las requisiciones de materiales:", errorMessage);
+    throw new Error(
+      `No se pudieron cargar las requisiciones. Aplica la migración supabase/migrations/20261015140000_material_requisitions.sql. Detalle: ${errorMessage}`
+    );
+  }
+
+  return [
+    ...(pendingResult.data ?? []),
+    ...(historyResult.data ?? []),
+  ] as unknown as RequisicionMaterial[];
+}
+
+export async function createMaterialRequisitionAction(input: {
+  departamento_solicitante: string;
+  fecha_estimada: string;
+  motivo: string;
+  solicitado_por: string;
+  detalles: Array<{ descripcion: string; cantidad: number; unidad: string }>;
+}): Promise<void> {
+  await requireActor(2);
+  if (
+    !input ||
+    typeof input !== "object" ||
+    Array.isArray(input) ||
+    typeof input.departamento_solicitante !== "string" ||
+    typeof input.fecha_estimada !== "string" ||
+    typeof input.motivo !== "string" ||
+    typeof input.solicitado_por !== "string"
+  ) {
+    throw new Error("Los datos de la requisición no son válidos.");
+  }
+  const departamento = requireText(input.departamento_solicitante, "El departamento solicitante", 120);
+  const motivo = requireText(input.motivo, "El motivo de la solicitud", 500);
+  const solicitadoPor = requireText(input.solicitado_por, "La persona solicitante", 120);
+  const isValidDate = (value: string) =>
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`)) &&
+    new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
+
+  if (!isValidDate(input.fecha_estimada)) {
+    throw new Error("Indica una fecha estimada válida.");
+  }
+  const dateParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Mexico_City",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const dateValues = Object.fromEntries(dateParts.map((part) => [part.type, part.value]));
+  const fechaSolicitud = `${dateValues.year}-${dateValues.month}-${dateValues.day}`;
+  if (input.fecha_estimada < fechaSolicitud) {
+    throw new Error("La fecha estimada no puede ser anterior a la fecha de solicitud.");
+  }
+  if (!Array.isArray(input.detalles) || input.detalles.length < 1 || input.detalles.length > 50) {
+    throw new Error("La requisición debe incluir de 1 a 50 materiales.");
+  }
+
+  const detalles = input.detalles.map((detalle) => {
+    if (
+      !detalle ||
+      typeof detalle !== "object" ||
+      Array.isArray(detalle) ||
+      typeof detalle.descripcion !== "string" ||
+      typeof detalle.unidad !== "string"
+    ) {
+      throw new Error("Los datos de uno o más materiales no son válidos.");
+    }
+    const descripcion = requireText(detalle.descripcion, "La descripción del material", 200);
+    const unidad = requireText(detalle.unidad, "La unidad de medida", 30);
+    if (!Number.isFinite(detalle.cantidad) || detalle.cantidad <= 0 || detalle.cantidad > 1_000_000_000) {
+      throw new Error("Cada cantidad debe ser un número mayor que cero.");
+    }
+    return { descripcion, cantidad: detalle.cantidad, unidad };
+  });
+
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("crear_requisicion_material", {
+    p_departamento_solicitante: departamento,
+    p_fecha_solicitud: fechaSolicitud,
+    p_fecha_estimada: input.fecha_estimada,
+    p_motivo: motivo,
+    p_solicitado_por: solicitadoPor,
+    p_detalles: detalles,
+  });
+
+  if (error) {
+    console.error("Error creando requisición de materiales:", error.message);
+    throw new Error(`No se pudo crear la requisición. Detalle: ${error.message}`);
+  }
+  if (typeof data !== "string" || !data) {
+    throw new Error("La base de datos no confirmó el registro de la requisición.");
+  }
+  revalidatePath("/inventario");
+}
+
+export async function updateMaterialRequisitionStatusAction(
+  requisitionId: string,
+  status: "completa" | "cancelada"
+): Promise<void> {
+  await requireActor(2);
+  if (
+    typeof requisitionId !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requisitionId) ||
+    (status !== "completa" && status !== "cancelada")
+  ) {
+    throw new Error("La requisición o el estado seleccionado no son válidos.");
+  }
+
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("requisiciones_materiales")
+    .update({
+      estado: status,
+      completada_at: status === "completa" ? new Date().toISOString() : null,
+    })
+    .eq("id", requisitionId)
+    .eq("estado", "pendiente")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error actualizando el estado de una requisición:", error.message);
+    throw new Error(`No se pudo actualizar la requisición. Detalle: ${error.message}`);
+  }
+  if (!data) {
+    throw new Error("La requisición ya no está pendiente o no existe.");
+  }
+  revalidatePath("/inventario");
 }
 
 export async function getInventoryAreaMaterialsForExportAction(area?: string): Promise<MaterialArea[]> {
@@ -380,7 +656,11 @@ export async function createMaterialAreaAction(input: {
   unidad: string;
   stock_actual: number;
   stock_minimo: number;
-}): Promise<{ material: MaterialArea; correo: EmailResult | null }> {
+}): Promise<{
+  material: MaterialArea;
+  correo: EmailResult | null;
+  notificaciones: InventoryPushResult | null;
+}> {
   const actor = await requireActor(2);
   const nombre = requireText(input.nombre, "El nombre del material", 120);
   const area = requireText(input.area, "El área", 100);
@@ -421,6 +701,16 @@ export async function createMaterialAreaAction(input: {
   const correo = result.alerta_id
     ? await deliverLowStockAlert(supabase, result.alerta_id)
     : null;
+  const notificaciones = result.alerta_id
+    ? await notifyInventoryAdministrators(supabase, {
+        id: result.alerta_id,
+        nombre: result.nombre,
+        area: result.area,
+        stock: Number(result.stock_actual),
+        minimo: Number(result.stock_minimo),
+        unidad: result.unidad,
+      })
+    : null;
   revalidatePath("/inventario");
   return {
     material: {
@@ -434,6 +724,7 @@ export async function createMaterialAreaAction(input: {
       created_at: result.created_at,
     },
     correo,
+    notificaciones,
   };
 }
 
@@ -446,7 +737,11 @@ export async function registerMaterialMovementAction(input: {
   referencia?: string;
   costo_unitario?: number;
   detalle?: string;
-}): Promise<{ movimiento: RpcMovementResult; correo: EmailResult | null }> {
+}): Promise<{
+  movimiento: RpcMovementResult;
+  correo: EmailResult | null;
+  notificaciones: InventoryPushResult | null;
+}> {
   const actor = await requireActor(input.tipo === "consumo" ? 4 : 2);
 
   if (!input.material_id || !Number.isFinite(input.cantidad) || Math.abs(input.cantidad) > 1_000_000_000) {
@@ -502,12 +797,21 @@ export async function registerMaterialMovementAction(input: {
   }
 
   let correo: EmailResult | null = null;
+  let notificaciones: InventoryPushResult | null = null;
   if (rpcResult.alerta_id) {
     correo = await deliverLowStockAlert(supabase, rpcResult.alerta_id);
+    notificaciones = await notifyInventoryAdministrators(supabase, {
+      id: rpcResult.alerta_id,
+      nombre: rpcResult.nombre,
+      area: rpcResult.area,
+      stock: Number(rpcResult.stock_actual),
+      minimo: Number(rpcResult.stock_minimo),
+      unidad: rpcResult.unidad,
+    });
   }
 
   revalidatePath("/inventario");
-  return { movimiento: rpcResult, correo };
+  return { movimiento: rpcResult, correo, notificaciones };
 }
 
 async function deliverLowStockAlert(

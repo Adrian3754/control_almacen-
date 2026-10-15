@@ -9,19 +9,30 @@ import {
   getInventoryAlertsAction,
   getInventoryAreaMaterialsForExportAction,
   getInventoryMovementsAction,
+  getMaterialRequisitionsAction,
+  createMaterialRequisitionAction,
+  updateMaterialRequisitionStatusAction,
   registerMaterialMovementAction,
   retryMaterialAlertAction,
   type AlertaMaterial,
   type MaterialArea,
   type MaterialConsumo,
+  type RequisicionMaterial,
   type RegistroConsumoMaterial,
   type MovimientoMaterial,
 } from "@/components/actions/inventario-materiales.actions";
 import { getEmployeeSession, type EmployeeSession } from "@/lib/employeeSession";
+import InventoryPushNotifications from "@/components/InventoryPushNotifications";
 
-type Dialog = "material" | "compra" | "consumo" | null;
+type Dialog = "material" | "compra" | "consumo" | "requisicion" | null;
 type Feedback = { kind: "success" | "error" | "warning"; text: string } | null;
-type InventoryModule = "existencias" | "consumos" | "alertas" | "movimientos";
+type InventoryModule = "existencias" | "consumos" | "alertas" | "movimientos" | "requisiciones";
+type InventoryPushResult = {
+  status: "sent" | "partial" | "no_subscribers" | "not_configured" | "error";
+  sent: number;
+  failed: number;
+};
+type RequisitionFormLine = { descripcion: string; cantidad: string; unidad: string };
 
 const inventoryPageSize = 50;
 
@@ -39,6 +50,28 @@ const measurementUnits = [
   "Paquetes",
   "Rollos",
 ];
+
+function getMexicoDateInputValue(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Mexico_City",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function createEmptyRequisitionForm() {
+  return {
+    departamento_solicitante: "",
+    fecha_solicitud: getMexicoDateInputValue(),
+    fecha_estimada: "",
+    motivo: "",
+    solicitado_por: "",
+    detalles: [{ descripcion: "", cantidad: "", unidad: "Piezas" }] as RequisitionFormLine[],
+  };
+}
 
 const inventoryAreas = [
   { name: "Lavado de fruta", id: "lavado-de-fruta", icon: "🍋", description: "Insumos para el lavado de fruta", color: "bg-lime-50 text-lime-800 ring-lime-200" },
@@ -83,6 +116,13 @@ const inventoryModules: Array<{
     icon: "🔄",
     color: "sky",
   },
+  {
+    id: "requisiciones",
+    title: "Requisiciones",
+    description: "Solicitudes pendientes y fechas estimadas",
+    icon: "📝",
+    color: "rose",
+  },
 ];
 
 const consumptionColors = [
@@ -103,6 +143,23 @@ function formatCurrency(value: number) {
     currency: "MXN",
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+function formatPushResult(result: InventoryPushResult | null) {
+  if (!result) return "";
+  if (result.status === "sent") {
+    return ` Se enviaron avisos a ${result.sent} dispositivo${result.sent === 1 ? "" : "s"}.`;
+  }
+  if (result.status === "partial") {
+    return ` Se enviaron avisos a ${result.sent} dispositivo${result.sent === 1 ? "" : "s"}, pero fallaron ${result.failed}.`;
+  }
+  if (result.status === "not_configured") {
+    return " Las notificaciones push no están configuradas en el servidor.";
+  }
+  if (result.status === "error") {
+    return " No se pudieron enviar las notificaciones push; revisa el registro del servidor.";
+  }
+  return " No hay dispositivos administrativos con notificaciones activadas.";
 }
 
 function lowStock(material: MaterialArea) {
@@ -605,6 +662,119 @@ function AlertsList({
   );
 }
 
+function RequisitionsList({
+  requisitions,
+  busyId,
+  onStatusChange,
+}: {
+  requisitions: RequisicionMaterial[];
+  busyId: string | null;
+  onStatusChange: (id: string, status: "completa" | "cancelada") => void;
+}) {
+  if (requisitions.length === 0) {
+    return (
+      <p className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+        Todavía no hay requisiciones. Registra una solicitud para empezar a dar seguimiento.
+      </p>
+    );
+  }
+
+  const today = getMexicoDateInputValue();
+  return (
+    <div className="space-y-3">
+      {requisitions.map((requisition) => {
+        const daysRemaining = Math.round(
+          (Date.parse(`${requisition.fecha_estimada}T00:00:00Z`) -
+            Date.parse(`${today}T00:00:00Z`)) /
+            86_400_000
+        );
+        const isPending = requisition.estado === "pendiente";
+        const deadlineText = daysRemaining > 0
+          ? `Faltan ${daysRemaining} día${daysRemaining === 1 ? "" : "s"}`
+          : daysRemaining === 0
+            ? "Vence hoy"
+            : `Vencida hace ${Math.abs(daysRemaining)} día${daysRemaining === -1 ? "" : "s"}`;
+        const deadlineStyle = daysRemaining < 0
+          ? "bg-rose-100 text-rose-800"
+          : daysRemaining <= 3
+            ? "bg-amber-100 text-amber-900"
+            : "bg-emerald-100 text-emerald-800";
+
+        return (
+          <article key={requisition.id} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-bold text-slate-900">
+                    Requisición {requisition.id.slice(0, 8).toUpperCase()} · {requisition.departamento_solicitante}
+                  </h3>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+                    requisition.estado === "completa"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : requisition.estado === "cancelada"
+                        ? "bg-slate-100 text-slate-600"
+                        : "bg-sky-100 text-sky-800"
+                  }`}>
+                    {requisition.estado === "completa"
+                      ? "Recibida"
+                      : requisition.estado === "cancelada"
+                        ? "Cancelada"
+                        : "Pendiente"}
+                  </span>
+                  {isPending ? (
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${deadlineStyle}`}>
+                      {deadlineText}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-2 text-sm text-slate-600">
+                  Solicitud: {new Date(`${requisition.fecha_solicitud}T00:00:00`).toLocaleDateString("es-MX")}
+                  {" · "}Fecha estimada: {new Date(`${requisition.fecha_estimada}T00:00:00`).toLocaleDateString("es-MX")}
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  Solicitado por {requisition.solicitado_por} · {requisition.motivo}
+                </p>
+              </div>
+              {isPending ? (
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onStatusChange(requisition.id, "completa")}
+                    disabled={busyId === requisition.id}
+                    className="min-h-10 rounded-xl bg-emerald-800 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-900 disabled:opacity-50"
+                  >
+                    {busyId === requisition.id ? "Guardando..." : "Marcar recibida"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onStatusChange(requisition.id, "cancelada")}
+                    disabled={busyId === requisition.id}
+                    className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : null}
+            </div>
+            <div className="mt-4 overflow-hidden rounded-xl border border-slate-100">
+              <div className="grid grid-cols-[1fr_auto_auto] gap-3 bg-slate-50 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                <span>Material / servicio</span><span>Cantidad</span><span>Unidad</span>
+              </div>
+              {requisition.detalles.map((detail) => (
+                <div key={detail.id} className="grid grid-cols-[1fr_auto_auto] gap-3 border-t border-slate-100 px-3 py-2.5 text-sm text-slate-700">
+                  <span>{detail.descripcion}</span>
+                  <span>{formatQuantity(detail.cantidad)}</span>
+                  <span>{detail.unidad}</span>
+                </div>
+              ))}
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function InventarioPage() {
   const [session, setSession] = useState<EmployeeSession | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
@@ -616,6 +786,9 @@ export default function InventarioPage() {
   const [movementsLoading, setMovementsLoading] = useState(true);
   const [alerts, setAlerts] = useState<AlertaMaterial[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(true);
+  const [requisitions, setRequisitions] = useState<RequisicionMaterial[]>([]);
+  const [requisitionsLoading, setRequisitionsLoading] = useState(true);
+  const [requisitionsError, setRequisitionsError] = useState("");
   const [consumptionHistory, setConsumptionHistory] = useState<RegistroConsumoMaterial[]>([]);
   const [consumptionHistoryLoading, setConsumptionHistoryLoading] = useState(true);
   const [consumptionHistoryError, setConsumptionHistoryError] = useState("");
@@ -629,6 +802,7 @@ export default function InventarioPage() {
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [retryingAlert, setRetryingAlert] = useState<string | null>(null);
+  const [requisitionBusyId, setRequisitionBusyId] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [adminModule, setAdminModule] = useState<InventoryModule>("existencias");
   const [areaPages, setAreaPages] = useState<Record<string, number>>({});
@@ -654,6 +828,7 @@ export default function InventarioPage() {
     cantidad: "",
     detalle: "",
   });
+  const [requisitionForm, setRequisitionForm] = useState(createEmptyRequisitionForm);
 
   const canManage = Number(session?.nivel_jerarquia ?? 3) <= 2;
   const isConsumptionOnly = Number(session?.nivel_jerarquia) === 4;
@@ -669,6 +844,13 @@ export default function InventarioPage() {
       const currentSession = getEmployeeSession();
       setSession(currentSession);
       setSessionReady(true);
+      if (
+        Number(currentSession?.nivel_jerarquia ?? 3) <= 2 &&
+        new URLSearchParams(window.location.search).get("module") === "requisiciones"
+      ) {
+        setAdminModule("requisiciones");
+        setLoading(false);
+      }
       if (!currentSession || Number(currentSession.nivel_jerarquia) === 4) {
         setLoading(false);
       }
@@ -766,6 +948,30 @@ export default function InventarioPage() {
   }, [adminModule, canManage, isConsumptionOnly, refreshVersion, session, sessionReady]);
 
   useEffect(() => {
+    if (!sessionReady || !session || !canManage || adminModule !== "requisiciones") return;
+    let active = true;
+    getMaterialRequisitionsAction()
+      .then((records) => {
+        if (!active) return;
+        setRequisitions(records);
+        setRequisitionsError("");
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setRequisitionsError(
+            error instanceof Error ? error.message : "No se pudieron cargar las requisiciones."
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setRequisitionsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [adminModule, canManage, refreshVersion, session, sessionReady]);
+
+  useEffect(() => {
     if (!sessionReady || !session || (!isConsumptionOnly && canManage && adminModule !== "consumos")) return;
     let active = true;
 
@@ -795,6 +1001,7 @@ export default function InventarioPage() {
     if (isConsumptionOnly || !canManage || adminModule === "consumos") setConsumptionHistoryLoading(true);
     if (!canManage || adminModule === "alertas") setAlertsLoading(true);
     if (!canManage || adminModule === "movimientos") setMovementsLoading(true);
+    if (canManage && adminModule === "requisiciones") setRequisitionsLoading(true);
     setRefreshVersion((version) => version + 1);
   };
 
@@ -821,6 +1028,12 @@ export default function InventarioPage() {
 
   function openDialog(nextDialog: Exclude<Dialog, null>) {
     setFeedback(null);
+    if (nextDialog === "requisicion") {
+      setRequisitionForm({
+        ...createEmptyRequisitionForm(),
+        solicitado_por: session?.nombre || session?.numero_empleado || "",
+      });
+    }
     setDialog(nextDialog);
   }
 
@@ -849,13 +1062,13 @@ export default function InventarioPage() {
         result.correo?.status === "error"
           ? {
               kind: "warning",
-              text: `Material registrado con ${formatQuantity(result.material.stock_actual)} ${result.material.unidad}. El aviso para Compras no pudo enviarse: ${result.correo.message}`,
+              text: `Material registrado con ${formatQuantity(result.material.stock_actual)} ${result.material.unidad}. El aviso para Compras no pudo enviarse: ${result.correo.message}${formatPushResult(result.notificaciones)}`,
             }
           : {
               kind: "success",
               text: result.correo
-                ? `Material registrado con ${formatQuantity(result.material.stock_actual)} ${result.material.unidad}. ${result.correo.message}`
-                : `Material registrado con ${formatQuantity(result.material.stock_actual)} ${result.material.unidad} en existencia.`,
+                ? `Material registrado con ${formatQuantity(result.material.stock_actual)} ${result.material.unidad}. ${result.correo.message}${formatPushResult(result.notificaciones)}`
+                : `Material registrado con ${formatQuantity(result.material.stock_actual)} ${result.material.unidad} en existencia.${formatPushResult(result.notificaciones)}`,
             }
       );
       updateData();
@@ -898,10 +1111,10 @@ export default function InventarioPage() {
           ? {
               kind: result.correo.status === "enviado" ? "success" : "warning",
               text: result.correo.status === "enviado"
-                ? `Compra recibida. ${result.correo.message}`
-                : `Compra recibida y existencias actualizadas, pero el aviso por correo no pudo enviarse: ${result.correo.message}`,
+                ? `Compra recibida. ${result.correo.message}${formatPushResult(result.notificaciones)}`
+                : `Compra recibida y existencias actualizadas, pero el aviso por correo no pudo enviarse: ${result.correo.message}${formatPushResult(result.notificaciones)}`,
             }
-          : { kind: "success", text: "Compra recibida y existencias actualizadas." }
+          : { kind: "success", text: `Compra recibida y existencias actualizadas.${formatPushResult(result.notificaciones)}` }
       );
       updateData();
     } catch (error: unknown) {
@@ -930,16 +1143,80 @@ export default function InventarioPage() {
           ? {
               kind: result.correo.status === "enviado" ? "success" : "warning",
               text: result.correo.status === "enviado"
-                ? result.correo.message
-                : `Consumo registrado, pero el aviso por correo no pudo enviarse: ${result.correo.message}`,
+                ? `${result.correo.message}${formatPushResult(result.notificaciones)}`
+                : `Consumo registrado, pero el aviso por correo no pudo enviarse: ${result.correo.message}${formatPushResult(result.notificaciones)}`,
             }
-          : { kind: "success", text: "Consumo registrado y existencias actualizadas." }
+          : { kind: "success", text: `Consumo registrado y existencias actualizadas.${formatPushResult(result.notificaciones)}` }
       );
       updateData();
     } catch (error: unknown) {
       setFeedback({ kind: "error", text: error instanceof Error ? error.message : "No se pudo registrar el consumo." });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleCreateRequisition(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session) return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      await createMaterialRequisitionAction({
+        departamento_solicitante: requisitionForm.departamento_solicitante,
+        fecha_estimada: requisitionForm.fecha_estimada,
+        motivo: requisitionForm.motivo,
+        solicitado_por: requisitionForm.solicitado_por,
+        detalles: requisitionForm.detalles.map((detail) => ({
+          descripcion: detail.descripcion,
+          cantidad: Number(detail.cantidad),
+          unidad: detail.unidad,
+        })),
+      });
+      setRequisitionForm(createEmptyRequisitionForm());
+      setDialog(null);
+      setAdminModule("requisiciones");
+      setRequisitionsLoading(true);
+      setRequisitionsError("");
+      setRefreshVersion((version) => version + 1);
+      setFeedback({
+        kind: "success",
+        text: "Requisición registrada. Se mostrará el tiempo restante y recibirás un aviso push diario en los dispositivos activados.",
+      });
+    } catch (error: unknown) {
+      setFeedback({
+        kind: "error",
+        text: error instanceof Error ? error.message : "No se pudo registrar la requisición.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRequisitionStatusChange(
+    requisitionId: string,
+    status: "completa" | "cancelada"
+  ) {
+    setRequisitionBusyId(requisitionId);
+    setFeedback(null);
+    try {
+      await updateMaterialRequisitionStatusAction(requisitionId, status);
+      setFeedback({
+        kind: "success",
+        text: status === "completa"
+          ? "Requisición marcada como recibida; dejará de generar recordatorios."
+          : "Requisición cancelada; dejará de generar recordatorios.",
+      });
+      setRequisitionsLoading(true);
+      setRequisitionsError("");
+      setRefreshVersion((version) => version + 1);
+    } catch (error: unknown) {
+      setFeedback({
+        kind: "error",
+        text: error instanceof Error ? error.message : "No se pudo actualizar la requisición.",
+      });
+    } finally {
+      setRequisitionBusyId(null);
     }
   }
 
@@ -970,6 +1247,7 @@ export default function InventarioPage() {
   const showConsumptionModule = !canManage || adminModule === "consumos";
   const showAlertsModule = !canManage || adminModule === "alertas";
   const showMovementsModule = !canManage || adminModule === "movimientos";
+  const showRequisitionsModule = canManage && adminModule === "requisiciones";
 
   if (!sessionReady || loading) {
     return (
@@ -1060,6 +1338,11 @@ export default function InventarioPage() {
                 Registrar compra
               </button>
             ) : null}
+            {canManage ? (
+              <button type="button" onClick={() => openDialog("requisicion")} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-sm font-semibold text-rose-800 transition hover:bg-rose-50">
+                + Requisición
+              </button>
+            ) : null}
             <button type="button" onClick={() => openDialog("consumo")} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
               Registrar consumo
             </button>
@@ -1067,13 +1350,14 @@ export default function InventarioPage() {
         </header>
 
         <FeedbackBanner feedback={feedback} />
+        {canManage ? <InventoryPushNotifications /> : null}
         {canManage ? (
           <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <div className="mb-4">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">Espacio administrativo</p>
               <h2 className="mt-1 text-lg font-bold text-slate-900">¿Qué deseas consultar?</h2>
             </div>
-            <nav aria-label="Módulos de Compras e inventario" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <nav aria-label="Módulos de Compras e inventario" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
               {inventoryModules.map((module) => {
                 const isActive = adminModule === module.id;
                 const isInventory = module.id === "existencias";
@@ -1083,12 +1367,15 @@ export default function InventarioPage() {
                     ? alerts.length
                     : module.id === "movimientos"
                       ? movements.length
-                      : totalMaterials;
+                      : module.id === "requisiciones"
+                        ? requisitions.filter((requisition) => requisition.estado === "pendiente").length
+                        : totalMaterials;
                 const activeStyles = {
                   emerald: "border-emerald-300 bg-emerald-50 ring-2 ring-emerald-100",
                   violet: "border-violet-300 bg-violet-50 ring-2 ring-violet-100",
                   amber: "border-amber-300 bg-amber-50 ring-2 ring-amber-100",
                   sky: "border-sky-300 bg-sky-50 ring-2 ring-sky-100",
+                  rose: "border-rose-300 bg-rose-50 ring-2 ring-rose-100",
                 }[module.color];
                 return (
                   <button
@@ -1100,8 +1387,10 @@ export default function InventarioPage() {
                       if (isInventory) setMaterialsLoading(true);
                       if (module.id === "alertas") setAlertsLoading(true);
                       if (module.id === "movimientos") setMovementsLoading(true);
+                      if (module.id === "requisiciones") setRequisitionsLoading(true);
                       setAlertsError("");
                       setMovementsError("");
+                      setRequisitionsError("");
                       setLoadError("");
                     }}
                     aria-current={isActive ? "page" : undefined}
@@ -1286,6 +1575,38 @@ export default function InventarioPage() {
             </Section>
         ) : null}
 
+        {showRequisitionsModule ? (
+          <Section
+            title="Requisiciones de materiales"
+            description="Consulta los pendientes, los días restantes y las fechas vencidas. Los pendientes generan un aviso push diario en los dispositivos activados."
+            action={
+              <button
+                type="button"
+                onClick={() => openDialog("requisicion")}
+                className="min-h-10 rounded-xl bg-rose-800 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-900"
+              >
+                + Nueva requisición
+              </button>
+            }
+          >
+            {requisitionsError ? (
+              <p role="alert" className="mb-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                {requisitionsError}
+              </p>
+            ) : requisitionsLoading ? (
+              <p role="status" className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                Cargando requisiciones...
+              </p>
+            ) : (
+              <RequisitionsList
+                requisitions={requisitions}
+                busyId={requisitionBusyId}
+                onStatusChange={handleRequisitionStatusChange}
+              />
+            )}
+          </Section>
+        ) : null}
+
         {showAlertsModule ? (
           <Section title="Alertas para Compras" description="Avisos creados al bajar del mínimo. Los correos fallidos se pueden reintentar.">
             {alertsError ? (
@@ -1314,6 +1635,165 @@ export default function InventarioPage() {
           </Section>
         ) : null}
       </div>
+
+      {dialog === "requisicion" && canManage ? (
+        <DialogShell
+          title="Nueva requisición de materiales"
+          description="Registra el departamento, los materiales y la fecha estimada para dar seguimiento a la solicitud."
+          onClose={() => setDialog(null)}
+        >
+          <form onSubmit={handleCreateRequisition} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block text-sm font-medium text-slate-700">
+                Departamento solicitante
+                <input
+                  required
+                  maxLength={120}
+                  value={requisitionForm.departamento_solicitante}
+                  onChange={(event) => setRequisitionForm({ ...requisitionForm, departamento_solicitante: event.target.value })}
+                  className={fieldClass}
+                  placeholder="Ej. Inocuidad"
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                Solicitado por
+                <input
+                  required
+                  maxLength={120}
+                  value={requisitionForm.solicitado_por}
+                  onChange={(event) => setRequisitionForm({ ...requisitionForm, solicitado_por: event.target.value })}
+                  className={fieldClass}
+                  placeholder="Nombre de quien solicita"
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                Fecha de requisición
+                <input
+                  type="date"
+                  value={requisitionForm.fecha_solicitud}
+                  disabled
+                  aria-describedby="requisition-request-date-help"
+                  className={`${fieldClass} cursor-not-allowed bg-slate-100 text-slate-500`}
+                />
+                <span id="requisition-request-date-help" className="mt-1 block text-xs text-slate-500">
+                  Se asigna automáticamente y no se puede modificar.
+                </span>
+              </label>
+              <label className="block text-sm font-medium text-slate-700 sm:col-span-2">
+                Fecha estimada
+                <input
+                  required
+                  type="date"
+                  min={requisitionForm.fecha_solicitud}
+                  value={requisitionForm.fecha_estimada}
+                  onChange={(event) => setRequisitionForm({ ...requisitionForm, fecha_estimada: event.target.value })}
+                  className={fieldClass}
+                />
+              </label>
+            </div>
+
+            <fieldset className="space-y-3">
+              <legend className="text-sm font-semibold text-slate-800">Materiales solicitados</legend>
+              {requisitionForm.detalles.map((detail, index) => (
+                <div key={index} className="grid gap-3 rounded-2xl border border-slate-200 p-3 sm:grid-cols-[minmax(0,1fr)_120px_150px_auto] sm:items-end">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Descripción
+                    <input
+                      required
+                      maxLength={200}
+                      value={detail.descripcion}
+                      onChange={(event) => setRequisitionForm((current) => ({
+                        ...current,
+                        detalles: current.detalles.map((item, itemIndex) =>
+                          itemIndex === index ? { ...item, descripcion: event.target.value } : item
+                        ),
+                      }))}
+                      className={fieldClass}
+                      placeholder="Ej. Escoba verde completa"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Cantidad
+                    <input
+                      required
+                      type="number"
+                      min="0.001"
+                      max="1000000000"
+                      step="0.001"
+                      value={detail.cantidad}
+                      onChange={(event) => setRequisitionForm((current) => ({
+                        ...current,
+                        detalles: current.detalles.map((item, itemIndex) =>
+                          itemIndex === index ? { ...item, cantidad: event.target.value } : item
+                        ),
+                      }))}
+                      className={fieldClass}
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Unidad
+                    <select
+                      required
+                      value={detail.unidad}
+                      onChange={(event) => setRequisitionForm((current) => ({
+                        ...current,
+                        detalles: current.detalles.map((item, itemIndex) =>
+                          itemIndex === index ? { ...item, unidad: event.target.value } : item
+                        ),
+                      }))}
+                      className={fieldClass}
+                    >
+                      {measurementUnits.map((unit) => (
+                        <option key={unit} value={unit}>{unit}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setRequisitionForm((current) => ({
+                      ...current,
+                      detalles: current.detalles.filter((_, itemIndex) => itemIndex !== index),
+                    }))}
+                    disabled={requisitionForm.detalles.length === 1}
+                    className="min-h-10 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label={`Eliminar material ${index + 1}`}
+                  >
+                    Quitar
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setRequisitionForm((current) => ({
+                  ...current,
+                  detalles: [...current.detalles, { descripcion: "", cantidad: "", unidad: "Piezas" }],
+                }))}
+                disabled={requisitionForm.detalles.length >= 50}
+                className="min-h-10 rounded-xl border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50"
+              >
+                + Agregar material
+              </button>
+            </fieldset>
+
+            <label className="block text-sm font-medium text-slate-700">
+              Motivo de la solicitud
+              <textarea
+                required
+                maxLength={500}
+                rows={3}
+                value={requisitionForm.motivo}
+                onChange={(event) => setRequisitionForm({ ...requisitionForm, motivo: event.target.value })}
+                className={fieldClass}
+                placeholder="Describe para qué se requiere el material"
+              />
+            </label>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setDialog(null)} className="min-h-11 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
+              <button type="submit" disabled={busy} className={primaryButtonClass}>{busy ? "Guardando..." : "Crear requisición"}</button>
+            </div>
+          </form>
+        </DialogShell>
+      ) : null}
 
       {dialog === "material" && canManage ? (
         <DialogShell

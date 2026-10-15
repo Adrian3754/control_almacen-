@@ -20,6 +20,34 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Alertas push de inventario
+
+Las notificaciones push se envían a los dispositivos donde un administrador o supervisor inició sesión y activó los avisos. Se generan cuando el inventario crea una alerta por existencias en el mínimo; al cerrar sesión, se elimina la suscripción de ese dispositivo.
+
+Para habilitarlas:
+
+1. Aplica `supabase/migrations/20261014110000_inventory_push_notifications.sql` en el proyecto Supabase.
+2. Genera una pareja de claves VAPID una sola vez con `npx web-push generate-vapid-keys`.
+3. Configura estas variables en el entorno local y en el proveedor de despliegue. No publiques ni compartas la clave privada:
+   - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`: clave pública VAPID.
+   - `VAPID_PRIVATE_KEY`: clave privada VAPID.
+   - `VAPID_SUBJECT`: un contacto como `mailto:soporte@example.com`.
+4. Reconstruye y despliega la aplicación; cada administrador activa el permiso desde Compras e inventario en cada dispositivo.
+
+El sitio debe servirse por HTTPS. En iPhone/iPad, las notificaciones requieren iOS/iPadOS 16.4 o posterior y abrir la aplicación desde su icono agregado a la pantalla de inicio.
+
+## Requisiciones y recordatorios de Compras
+
+Las requisiciones permiten capturar el departamento solicitante, varios materiales, el motivo y la fecha estimada. Mientras sigan pendientes, Compras muestra los días restantes o el tiempo vencido y envía un recordatorio push diario a los dispositivos administrativos que tengan activados los avisos. Al marcarlas recibidas o canceladas, dejan de generar recordatorios.
+
+Para habilitarlo:
+
+1. Aplica `supabase/migrations/20261015140000_material_requisitions.sql` después de las migraciones del módulo de materiales.
+2. Configura `CRON_SECRET` en el entorno de producción de Vercel con un valor aleatorio y privado. Puedes generarlo localmente con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
+3. Despliega a producción el archivo `vercel.json`; su tarea programada ejecuta los recordatorios diariamente a las 9:00 a. m. de Ciudad de México. La tarea también requiere las variables VAPID y Supabase ya configuradas para las notificaciones push.
+
+En desarrollo o Preview, el recordatorio se puede probar manualmente con una petición `GET` a `/api/compras/reminders` y el encabezado `Authorization: Bearer <CRON_SECRET>`.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
